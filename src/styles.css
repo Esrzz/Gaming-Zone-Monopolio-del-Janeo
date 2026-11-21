@@ -114,10 +114,9 @@ body {
   min-height: calc(100svh - 60px);
 }
 .board-wrap {
-  /* Ocupa todo el ancho disponible restando el sidebar, altura = ancho (cuadrado) */
-  width: calc(100vw - 280px);
-  height: calc(100vw - 280px);
-  max-height: calc(100svh - 60px);
+  /* El menor entre el ancho disponible y la altura visible — siempre cuadrado y sin scroll */
+  width: min(calc(100vw - 280px), calc(100svh - 60px));
+  height: min(calc(100vw - 280px), calc(100svh - 60px));
   position: relative;
 }
 .gboard { position: absolute; inset: 0; display: grid; border: 1px solid var(--line); border-radius: 0; overflow: hidden; background: rgba(14, 7, 34, 0.7); backdrop-filter: blur(10px); }
