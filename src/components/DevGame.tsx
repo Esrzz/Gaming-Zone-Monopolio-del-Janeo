@@ -126,8 +126,6 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings }: Prop
 
   return (
     <div className="game">
-      <Board game={game} seats={seats} shown={shown} colors={colors} />
-
       <aside className="side">
         <section className="panel-card">
           <h3>Jugadores</h3>
@@ -275,6 +273,8 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings }: Prop
           Salir de la partida de prueba
         </button>
       </aside>
+
+      <Board game={game} seats={seats} shown={shown} colors={colors} />
     </div>
   )
 }
