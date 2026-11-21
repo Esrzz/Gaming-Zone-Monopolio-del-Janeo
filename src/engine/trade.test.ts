@@ -52,12 +52,15 @@ describe('intercambios', () => {
     expect(player(s, B).cash).toBe(1600)
   })
 
-  it('se puede ofrecer en cualquier turno y no solo el propio', () => {
-    // es el turno de Ana (índice 0) y Cami propone
+  it('solo se puede ofrecer en tu turno (aunque ya hayas tirado), pero se responde en cualquier momento', () => {
+    // es el turno de Ana (índice 0): Cami no puede ofrecer
     let s = give(newGame(), [1], A)
-    s = run(s, propose(C, A, { cash: 200 }, { properties: [1] }))
-    s = run(s, { type: 'acceptTrade', player: A })
-    expect(s.owned[1].owner).toBe(C)
+    expect(fails(s, propose(C, A, { cash: 200 }, { properties: [1] }))).toMatch(/tu turno/)
+    // Ana ofrece después de tirar (fase 'end') y Beto, que no es su turno, acepta
+    s = { ...s, phase: 'end' }
+    s = run(s, propose(A, B, { properties: [1] }, { cash: 200 }))
+    s = run(s, { type: 'acceptTrade', player: B })
+    expect(s.owned[1].owner).toBe(B)
   })
 
   it('un intercambio puede completar un grupo y subir el alquiler', () => {
@@ -102,11 +105,11 @@ describe('intercambios', () => {
 
   it('hay una sola oferta abierta a la vez', () => {
     let s = run(newGame(), propose(A, B, { cash: 10 }, {}))
-    expect(fails(s, propose(B, C, { cash: 10 }, {}))).toMatch(/oferta abierta/)
+    expect(fails(s, propose(A, C, { cash: 10 }, {}))).toMatch(/oferta abierta/)
     s = run(s, { type: 'cancelTrade', player: A })
     expect(s.trade).toBeNull()
-    s = run(s, propose(B, C, { cash: 10 }, {}))
-    expect(s.trade?.from).toBe(B)
+    s = run(s, propose(A, C, { cash: 10 }, {}))
+    expect(s.trade?.to).toBe(C)
   })
 
   it('solo quien recibe acepta o rechaza, y solo quien ofrece cancela', () => {

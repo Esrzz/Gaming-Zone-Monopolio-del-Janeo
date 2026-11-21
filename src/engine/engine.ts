@@ -1,6 +1,6 @@
 import { BOARD, BOARD_SIZE, JAIL_POSITION, groupPositions, isBuyable, positionsOfKind, priceOf } from './board'
-import { CHANCE_CARDS, CHEST_CARDS, getCard } from './cards'
-import type { Action, GameEvent, GameState, Phase, PlayerId, PlayerState, Result, Rules } from './types'
+import { CHANCE_CARDS, CHEST_CARDS } from './cards'
+import type { Action, Card, GameEvent, GameState, Phase, PlayerId, PlayerState, Result, Rules } from './types'
 import { applyTradeAction, cancelTradeOf, isTradeAction } from './trade'
 
 export const DEFAULT_RULES: Rules = {
@@ -17,7 +17,32 @@ export const DEFAULT_RULES: Rules = {
 export const MIN_PLAYERS = 2
 export const MAX_PLAYERS = 6
 
-export function createGame(players: { id: PlayerId; name: string }[], rules: Partial<Rules> = {}): GameState {
+/** Baraja 0..n-1 (Fisher-Yates). `random` se puede inyectar para partidas reproducibles (servidor, tests). */
+export function shuffledOrder(n: number, random: () => number = Math.random): number[] {
+  const a = Array.from({ length: n }, (_, i) => i)
+  for (let i = n - 1; i > 0; i--) {
+    const j = Math.floor(random() * (i + 1))
+    ;[a[i], a[j]] = [a[j], a[i]]
+  }
+  return a
+}
+
+/** Carta que está en la posición `index` del mazo ya barajado de esta partida. */
+function cardAt(s: GameState, deck: 'chance' | 'chest', index: number) {
+  const cards = deck === 'chance' ? CHANCE_CARDS : CHEST_CARDS
+  const order = deck === 'chance' ? s.chanceOrder : s.chestOrder
+  return cards[order[((index % order.length) + order.length) % order.length]]
+}
+
+/**
+ * `random` decide el orden de los mazos de cartas. El estado guarda el orden resultante, así que
+ * después `applyAction` sigue siendo determinista: el servidor puede barajar una vez al crear la partida.
+ */
+export function createGame(
+  players: { id: PlayerId; name: string }[],
+  rules: Partial<Rules> = {},
+  random: () => number = Math.random,
+): GameState {
   if (players.length < MIN_PLAYERS || players.length > MAX_PLAYERS) {
     throw new Error(`La partida necesita entre ${MIN_PLAYERS} y ${MAX_PLAYERS} jugadores`)
   }
@@ -44,6 +69,8 @@ export function createGame(players: { id: PlayerId; name: string }[], rules: Par
     pot: 0,
     winner: null,
     pendingCard: null,
+    chanceOrder: shuffledOrder(CHANCE_CARDS.length, random),
+    chestOrder: shuffledOrder(CHEST_CARDS.length, random),
     chanceIndex: 0,
     chestIndex: 0,
     trade: null,
@@ -94,7 +121,7 @@ export function applyAction(prev: GameState, action: Action): Result {
     return { ok: true, state: s, events: ev }
   }
 
-  // Los intercambios se pueden proponer y responder en cualquier momento, aunque no sea tu turno.
+  // Los intercambios se responden en cualquier momento; proponerlos solo se puede en tu turno (ver trade.ts).
   if (isTradeAction(action)) {
     const error = applyTradeAction(s, ev, action)
     return error ? fail(error) : { ok: true, state: s, events: ev }
@@ -187,7 +214,7 @@ export function applyAction(prev: GameState, action: Action): Result {
     case 'drawCard': {
       if (s.phase !== 'card' || !s.pendingCard) return fail('No hay carta para robar')
       const { deck, cardId } = s.pendingCard
-      const card = getCard(deck, deck === 'chance' ? s.chanceIndex - 1 : s.chestIndex - 1)
+      const card = cardAt(s, deck, (deck === 'chance' ? s.chanceIndex : s.chestIndex) - 1)
       if (card.id !== cardId) return fail('Carta inválida')
 
       ev.push({ type: 'card-drawn', player: me.id, deck, cardId: card.id, text: card.text })
@@ -209,7 +236,7 @@ function applyCardEffect(
   s: GameState,
   ev: GameEvent[],
   p: PlayerState,
-  effect: ReturnType<typeof getCard>['effect'],
+  effect: Card['effect'],
 ) {
   switch (effect.kind) {
     case 'collectFromBank': {
@@ -367,7 +394,7 @@ function resolveLandingWithBonus(
       }
       break
     case 'chance': {
-      const card = CHANCE_CARDS[s.chanceIndex % CHANCE_CARDS.length]
+      const card = cardAt(s, 'chance', s.chanceIndex)
       s.chanceIndex += 1
       s.pendingCard = { deck: 'chance', cardId: card.id }
       s.phase = 'card'
@@ -375,7 +402,7 @@ function resolveLandingWithBonus(
       break
     }
     case 'chest': {
-      const card = CHEST_CARDS[s.chestIndex % CHEST_CARDS.length]
+      const card = cardAt(s, 'chest', s.chestIndex)
       s.chestIndex += 1
       s.pendingCard = { deck: 'chest', cardId: card.id }
       s.phase = 'card'

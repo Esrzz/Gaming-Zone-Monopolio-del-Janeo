@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import ranking from '../data/ranking.json'
 import { BOARD, groupPositions, isBuyable } from './board'
-import { applyAction, computeRent, createGame, currentPlayer } from './engine'
+import { applyAction, computeRent, createGame, currentPlayer, shuffledOrder } from './engine'
+import { CHANCE_CARDS, CHEST_CARDS } from './cards'
 import type { Action, GameEvent, GameState } from './types'
 
 const A = 'a'
@@ -335,5 +336,36 @@ describe('bancarrota', () => {
     s = run(s, { type: 'decline', player: C }).state
     s = run(s, { type: 'endTurn', player: C }).state
     expect(currentPlayer(s).id).toBe(B) // saltea a Ana, que quebró
+  })
+})
+
+describe('mazos de cartas', () => {
+  const players = [
+    { id: 'a', name: 'A' },
+    { id: 'b', name: 'B' },
+  ]
+  const seeded = (seed: number) => () => {
+    seed = (seed * 1664525 + 1013904223) % 4294967296
+    return seed / 4294967296
+  }
+
+  it('cada mazo es una permutación completa de sus cartas', () => {
+    const s = createGame(players)
+    expect([...s.chanceOrder].sort((x, y) => x - y)).toEqual(CHANCE_CARDS.map((_, i) => i))
+    expect([...s.chestOrder].sort((x, y) => x - y)).toEqual(CHEST_CARDS.map((_, i) => i))
+  })
+
+  it('el orden depende del azar inyectado: misma semilla = mismo orden, otra semilla = otro orden', () => {
+    expect(createGame(players, {}, seeded(1)).chanceOrder).toEqual(createGame(players, {}, seeded(1)).chanceOrder)
+    expect(createGame(players, {}, seeded(1)).chanceOrder).not.toEqual(createGame(players, {}, seeded(2)).chanceOrder)
+    expect(shuffledOrder(10, seeded(7))).not.toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
+  })
+
+  it('las cartas salen en el orden barajado, no en el de la lista', () => {
+    let s = createGame(players, {}, seeded(3))
+    s = { ...s, current: 0, phase: 'roll', players: s.players.map((p) => ({ ...p, position: 0 })) }
+    const r = applyAction(s, { type: 'roll', player: 'a', dice: [3, 4] }) // casilla 7: Suerte
+    expect(r.ok).toBe(true)
+    if (r.ok) expect(r.state.pendingCard?.cardId).toBe(CHANCE_CARDS[s.chanceOrder[0]].id)
   })
 })

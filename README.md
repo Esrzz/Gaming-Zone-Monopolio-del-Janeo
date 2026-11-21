@@ -62,3 +62,11 @@ su texto (se cierra con un clic o a los 4,5 s) y recién ahí se aplica el efect
   Nombres usados: `Cardbought`, `Dados`, `Jail`, `Lose`, `Slice`, `Victory`, `cardtaken`, `click`, `moneycollected`, `moneypaid`, `neg`, `timerout`.
 - La lista se genera con el plugin `vite-plugins/audioManifest.ts` (`/audio/manifest.json`), sin tocar código.
 - Los dados giran con números al azar hasta que termina el sonido `Dados`; `timerout` arranca cuando faltan tantos segundos como dura el audio (termina junto con el turno) y se corta si el turno acaba antes.
+
+## Turno, tarjetas de propiedad y descripciones
+
+- **Timer**: un único reloj por turno (240 s, `VITE_TURN_SECONDS`) que corre durante todo el turno, no solo antes de tirar. Al agotarse se juega solo lo que falte (tirar, no comprar, sacar carta, terminar turno).
+- **Intercambios**: solo se pueden proponer en tu turno (antes o después de tirar). Al proponer, el reloj del turno queda en pausa y corre el de quien recibe la oferta (60 s, `VITE_TRADE_SECONDS`); si se agota, se rechaza.
+- **Tarjeta de propiedad**: al caer en una propiedad sale de la casilla con su info; libre → Comprar / No comprar, ajena → Pagar. Cualquier casilla comprable se puede consultar con un clic, también fuera de turno.
+- **Descripciones**: en `src/engine/board.ts`, cada elemento de `STREET_SLOTS` acepta `description: '...'` (y `platform(nombre, icono, descripcion)` / `utility(...)`); la tarjeta la muestra.
+- **Mazos**: se barajan al crear la partida (el orden queda guardado en el estado, así que el motor sigue siendo determinista). `createGame(jugadores, reglas, random)` acepta un `random` propio para que el servidor decida el orden.

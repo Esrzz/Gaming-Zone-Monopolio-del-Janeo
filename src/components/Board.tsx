@@ -1,8 +1,10 @@
 import { BOARD } from '../engine'
 import type { GameState, Tile } from '../engine'
-import { GRID_TEMPLATE, GROUP_COLORS, gridCell, sideOf, tileCenter } from '../lib/layout'
+import { GRID_TEMPLATE, GROUP_COLORS, TOKEN_SIZE, gridCell, sideOf, tokenSlot } from '../lib/layout'
 import Avatar from './Avatar'
 import CardReveal from './CardReveal'
+import PropertyCard from './PropertyCard'
+import type { PropertyView } from './PropertyCard'
 
 export interface Seat {
   id: string
@@ -24,6 +26,10 @@ interface Props {
   rollFaces?: [number, number] | null
   reveal?: { deck: 'chance' | 'chest'; text: string } | null
   onCloseReveal?: () => void
+  /** Clic en una casilla comprable (consultar su información) */
+  onTileClick?: (pos: number) => void
+  /** Tarjeta de propiedad abierta y sus acciones */
+  property?: (PropertyView & { onBuy?: () => void; onDecline?: () => void; onPay?: () => void; onClose?: () => void }) | null
 }
 
 function stripColor(t: Tile): string | null {
@@ -46,8 +52,10 @@ function label(t: Tile): string {
   }
 }
 
-export default function Board({ game, seats, shown, colors, drawable = null, onDraw, rollFaces = null, reveal = null, onCloseReveal }: Props) {
+export default function Board({ game, seats, shown, colors, drawable = null, onDraw, rollFaces = null, reveal = null, onCloseReveal, onTileClick, property = null }: Props) {
   const tokens = seats.filter((s) => !game.players.find((p) => p.id === s.id)?.bankrupt)
+  const perTile: Record<number, number> = {}
+  for (const s of tokens) perTile[shown[s.id] ?? 0] = (perTile[shown[s.id] ?? 0] ?? 0) + 1
   const slot: Record<number, number> = {}
 
   return (
@@ -58,10 +66,12 @@ export default function Board({ game, seats, shown, colors, drawable = null, onD
           const o = game.owned[i]
           const color = stripColor(t)
           const icon = 'icon' in t ? t.icon : null
+          const info = t.kind === 'property' || t.kind === 'platform' || t.kind === 'utility'
           return (
             <div
               key={i}
-              className={`tile side-${sideOf(i)} k-${t.kind}`}
+              className={`tile side-${sideOf(i)} k-${t.kind}${info ? ' clickable' : ''}`}
+              onClick={info && onTileClick ? () => onTileClick(i) : undefined}
               style={{
                 gridRow: row,
                 gridColumn: col,
@@ -115,13 +125,21 @@ export default function Board({ game, seats, shown, colors, drawable = null, onD
       </div>
 
       {reveal && <CardReveal deck={reveal.deck} text={reveal.text} onClose={onCloseReveal} />}
+      {property && !reveal && (
+        <PropertyCard
+          view={property}
+          rules={game.rules}
+          onBuy={property.onBuy}
+          onDecline={property.onDecline}
+          onPay={property.onPay}
+          onClose={property.onClose}
+        />
+      )}
 
       {tokens.map((s) => {
         const pos = shown[s.id] ?? 0
         const n = (slot[pos] = (slot[pos] ?? -1) + 1)
-        const c = tileCenter(pos)
-        const dx = ((n % 3) - 1) * 18
-        const dy = Math.floor(n / 3) * 20 - 10
+        const c = tokenSlot(pos, n, perTile[pos] ?? 1)
         return (
           <span
             key={s.id}
@@ -129,11 +147,13 @@ export default function Board({ game, seats, shown, colors, drawable = null, onD
             style={{
               left: `${c.x}%`,
               top: `${c.y}%`,
-              transform: `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`,
+              width: `${TOKEN_SIZE}%`,
+              height: `${TOKEN_SIZE}%`,
+              transform: 'translate(-50%, -50%)',
               boxShadow: `0 0 0 3px ${colors[s.id]}, 0 4px 12px rgba(0,0,0,.5)`,
             }}
           >
-            <Avatar name={s.name} src={s.avatar} size={26} />
+            <Avatar name={s.name} src={s.avatar} size={40} />
           </span>
         )
       })}

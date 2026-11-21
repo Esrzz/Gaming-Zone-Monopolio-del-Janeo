@@ -4,8 +4,11 @@ import type { GroupId, RentTable, Tile } from './types'
 export const BOARD_SIZE = 40
 export const JAIL_POSITION = 10
 
-/** Casillas de calles (22), de la más barata a la más cara. */
-const STREET_SLOTS: { pos: number; group: GroupId; price: number; rent: RentTable; houseCost: number }[] = [
+/**
+ * Casillas de calles (22), de la más barata a la más cara.
+ * Se les puede agregar `description` (referencias al Discord, del juego, etc.): la muestra la tarjeta de propiedad.
+ */
+const STREET_SLOTS: { pos: number; group: GroupId; price: number; rent: RentTable; houseCost: number; description?: string }[] = [
   { pos: 1, group: 'brown', price: 60, rent: [2, 10, 30, 90, 160, 250], houseCost: 50 },
   { pos: 3, group: 'brown', price: 60, rent: [4, 20, 60, 180, 320, 450], houseCost: 50 },
   { pos: 6, group: 'lightblue', price: 100, rent: [6, 30, 90, 270, 400, 550], houseCost: 50 },
@@ -36,8 +39,8 @@ const STREET_SLOTS: { pos: number; group: GroupId; price: number; rent: RentTabl
  */
 const STREET_GAMES = ranking.slice(0, STREET_SLOTS.length)
 
-const platform = (name: string, icon: string): Tile => ({ kind: 'platform', name, price: 200, icon })
-const utility = (name: string, icon: string): Tile => ({ kind: 'utility', name, price: 150, icon })
+const platform = (name: string, icon: string, description?: string): Tile => ({ kind: 'platform', name, price: 200, icon, description })
+const utility = (name: string, icon: string, description?: string): Tile => ({ kind: 'utility', name, price: 150, icon, description })
 
 const FIXED: Record<number, Tile> =  {
   0: { kind: 'go', name: 'Salida' },
@@ -65,10 +68,10 @@ export const BOARD: Tile[] = Array.from({ length: BOARD_SIZE }, (_, i): Tile => 
   const fixed = FIXED[i]
   if (fixed) return fixed
   const slot = STREET_SLOTS.findIndex((s) => s.pos === i)
-  const { group, price, rent, houseCost } = STREET_SLOTS[slot]
+  const { group, price, rent, houseCost, description } = STREET_SLOTS[slot]
   // slot 0 = casilla más barata = juego menos jugado de los 22
   const game = STREET_GAMES[STREET_SLOTS.length - 1 - slot]
-  return { kind: 'property', name: game.name, group, price, rent, houseCost, icon: game.icon }
+  return { kind: 'property', name: game.name, group, price, rent, houseCost, icon: game.icon, description }
 })
 
 export function isBuyable(tile: Tile): boolean {

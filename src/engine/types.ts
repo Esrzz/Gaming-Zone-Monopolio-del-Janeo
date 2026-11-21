@@ -15,11 +15,11 @@ export type RentTable = [number, number, number, number, number, number]
 
 export type Tile =
   | { kind: 'go'; name: string }
-  | { kind: 'property'; name: string; group: GroupId; price: number; rent: RentTable; houseCost: number; icon?: string | null }
+  | { kind: 'property'; name: string; group: GroupId; price: number; rent: RentTable; houseCost: number; icon?: string | null; description?: string }
   /** Casillas de plataformas (las estaciones del Monopoly clásico): ver `Rules.platformRent` */
-  | { kind: 'platform'; name: string; price: number; icon?: string | null }
+  | { kind: 'platform'; name: string; price: number; icon?: string | null; description?: string }
   /** Casillas de servicio (Mute y Deafen): alquiler 4x o 10x los dados */
-  | { kind: 'utility'; name: string; price: number; icon?: string | null }
+  | { kind: 'utility'; name: string; price: number; icon?: string | null; description?: string }
   | { kind: 'tax'; name: string; amount: number }
   | { kind: 'chance'; name: string }
   | { kind: 'chest'; name: string }
@@ -83,7 +83,10 @@ export interface GameState {
   winner: PlayerId | null
   /** Carta que está esperando ser robada (fase 'card') */
   pendingCard: { deck: 'chance' | 'chest'; cardId: string } | null
-  /** Índices del tope de cada mazo (se avanzan al robar) */
+  /** Orden barajado de cada mazo (índices en CHANCE_CARDS / CHEST_CARDS), fijado al crear la partida */
+  chanceOrder: number[]
+  chestOrder: number[]
+  /** Cuántas cartas se sacaron de cada mazo (el tope es `order[index % order.length]`) */
   chanceIndex: number
   chestIndex: number
   /** Oferta de intercambio abierta (null si no hay) */

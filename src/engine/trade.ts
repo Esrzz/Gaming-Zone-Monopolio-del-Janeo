@@ -98,12 +98,14 @@ export const isTradeAction = (a: Action): a is TradeAction =>
   a.type === 'proposeTrade' || a.type === 'acceptTrade' || a.type === 'rejectTrade' || a.type === 'cancelTrade'
 
 /**
- * Los intercambios se pueden hacer en cualquier momento y en cualquier turno.
+ * Proponer un intercambio solo se puede en tu turno (antes o después de tirar, hasta que lo termines);
+ * responderlo (aceptar/rechazar) puede hacerlo quien lo recibe en cualquier momento.
  * Devuelve un mensaje de error, o null si la acción se aplicó sobre `s`.
  */
 export function applyTradeAction(s: GameState, ev: GameEvent[], action: TradeAction): string | null {
   switch (action.type) {
     case 'proposeTrade': {
+      if (s.players[s.current].id !== action.player) return 'Solo podés ofrecer intercambios en tu turno (hasta que lo termines)'
       if (s.trade) return 'Ya hay una oferta abierta: respondela o cancelala primero'
       const offer: TradeOffer = {
         from: action.player,

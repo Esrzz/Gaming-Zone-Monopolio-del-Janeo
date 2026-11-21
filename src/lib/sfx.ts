@@ -18,7 +18,8 @@ export type SfxName =
 export interface SfxHandle {
   /** Resuelve cuando el sonido termina, se corta o no puede reproducirse. */
   ended: Promise<void>
-  stop: () => void
+  /** Corta el sonido; con `fadeMs` baja el volumen antes de cortar (evita el "clic" de un corte seco). */
+  stop: (fadeMs?: number) => void
 }
 
 let volume = 0.7
@@ -60,6 +61,12 @@ export function setSfxMuted(m: boolean) {
   muted = m
 }
 
+/** Duración ya conocida (s) de la primera variante de un efecto; 0 si todavía no cargó. */
+export function knownDuration(name: SfxName, variant = 0): number {
+  const u = sfx[name]?.[variant]
+  return (u && durations.get(u)) || 0
+}
+
 /** Variantes disponibles de un efecto. */
 export function variants(name: SfxName): string[] {
   return sfx[name] ?? []
@@ -78,7 +85,10 @@ const NOOP: SfxHandle = { ended: Promise.resolve(), stop: () => {} }
  * Reproduce un efecto. Si hay varias variantes elige una al azar (sin repetir la última),
  * salvo que se pida una en concreto con `variant`.
  */
-export function play(name: SfxName, opts: { variant?: number } = {}): SfxHandle {
+export function play(
+  name: SfxName,
+  opts: { variant?: number; /** velocidad (1 = normal); acelera o frena el sonido sin cambiar el tono */ rate?: number; /** segundo del audio desde el que arranca */ startAt?: number } = {},
+): SfxHandle {
   const list = variants(name)
   if (!list.length || muted) return NOOP
   // Evita que varios eventos seguidos (p. ej. cobrar a 3 jugadores) apilen el mismo sonido
@@ -91,6 +101,11 @@ export function play(name: SfxName, opts: { variant?: number } = {}): SfxHandle 
 
   const a = new Audio(list[i])
   a.volume = volume
+  if (opts.rate && opts.rate !== 1) {
+    a.preservesPitch = true
+    a.playbackRate = opts.rate
+  }
+  if (opts.startAt && opts.startAt > 0) a.currentTime = opts.startAt
   playing.add(a)
   let finish: () => void = () => {}
   const ended = new Promise<void>((resolve) => {
@@ -104,9 +119,23 @@ export function play(name: SfxName, opts: { variant?: number } = {}): SfxHandle 
   a.play().catch(finish) // autoplay bloqueado: no se queda esperando
   return {
     ended,
-    stop: () => {
-      a.pause()
-      finish()
+    stop: (fadeMs = 0) => {
+      if (fadeMs <= 0) {
+        a.pause()
+        finish()
+        return
+      }
+      const from = a.volume
+      const t0 = performance.now()
+      const iv = setInterval(() => {
+        const k = Math.min(1, (performance.now() - t0) / fadeMs)
+        a.volume = from * (1 - k)
+        if (k >= 1) {
+          clearInterval(iv)
+          a.pause()
+          finish()
+        }
+      }, 16)
     },
   }
 }

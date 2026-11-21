@@ -7,22 +7,46 @@ import Avatar from './Avatar'
 import Board from './Board'
 import type { Seat } from './Board'
 import TradeModal from './TradeModal'
+import type { PropertyView } from './PropertyCard'
 import { cardPaysPlayer, isNegativeCard, sfxForEvent } from '../lib/sfxEvents'
-import { durationOf, play } from '../lib/sfx'
+import { knownDuration, play } from '../lib/sfx'
+import { moneyChanges } from '../lib/moneyFx'
 import type { SfxHandle } from '../lib/sfx'
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 const d6 = () => Math.floor(Math.random() * 6) + 1
 const clampDie = (n: number) => Math.min(6, Math.max(1, Math.round(n) || 1))
 
-const TURN_SECONDS = 60
+/** Tiempo total de cada turno (corre durante todo el turno, no solo al tirar). Configurable con VITE_TURN_SECONDS. */
+const TURN_SECONDS = Number(import.meta.env.VITE_TURN_SECONDS) || 240
+/** Tiempo que tiene quien recibe una oferta de intercambio para responderla (si no, se rechaza). */
+const TRADE_SECONDS = Number(import.meta.env.VITE_TRADE_SECONDS) || 60
 /** Tiempo máximo que se muestra la carta antes de seguir (se puede cerrar antes con un clic) */
 const CARD_SECONDS = 8
+/** Tiempo para pagar un alquiler en la tarjeta de propiedad (si no, se paga solo) */
+const PAY_SECONDS = 10
+/** Duración de cada paso de ficha, y tope del recorrido completo (los largos van más rápido) */
+const STEP_MS = 130
+const MAX_MOVE_MS = 2400
+const FLOAT_MS = 1800
+/**
+ * Segundos que faltan cuando suena el primer tick de la cuenta regresiva. El audio tiene un tick por segundo
+ * (a los 0, 1, 2 y 3 s) y el último segundo en silencio, así que con 4 los ticks caen en 4, 3, 2 y 1 s restantes.
+ */
+const TIMEROUT_LEAD_S = 4
+
+const fmt = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
 
 interface Props {
   seats: Seat[]
   onExit: () => void
   onSettings: () => void
+}
+
+interface Floating {
+  id: number
+  player: string
+  amount: number
 }
 
 /** Partida local de prueba: el developer tira los dados de todos los turnos. */
@@ -36,27 +60,29 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings }: Prop
   const [manual, setManual] = useState(false)
   const [dice, setDice] = useState<[number, number]>([1, 1])
   const [timeLeft, setTimeLeft] = useState(TURN_SECONDS)
+  const [tradeLeft, setTradeLeft] = useState(TRADE_SECONDS)
   const [reveal, setReveal] = useState<{ deck: 'chance' | 'chest'; text: string } | null>(null)
+  const [prop, setProp] = useState<PropertyView | null>(null)
+  const [floats, setFloats] = useState<Floating[]>([])
   const [tradeOpen, setTradeOpen] = useState(false)
   const [rollFaces, setRollFaces] = useState<[number, number] | null>(null)
-  const [timeoutDur, setTimeoutDur] = useState(0)
   const closeReveal = useRef<(() => void) | null>(null)
+  const payDone = useRef<(() => void) | null>(null)
   const alive = useRef(true)
   const logRef = useRef<HTMLOListElement>(null)
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const floatSeq = useRef(0)
+  // Temporizadores: restante en ms del turno y de la respuesta a una oferta
+  const turnMs = useRef(TURN_SECONDS * 1000)
+  const tradeMs = useRef(TRADE_SECONDS * 1000)
+  const firing = useRef(false)
+  const beep = useRef<{ key: string; h: SfxHandle } | null>(null)
 
   useEffect(() => {
     alive.current = true
     return () => {
       alive.current = false
+      beep.current?.h.stop()
     }
-  }, [])
-
-  // Duración del audio de cuenta regresiva (su último segundo coincide con el final del turno)
-  useEffect(() => {
-    void durationOf('timerout').then((d) => {
-      setTimeoutDur(d)
-    })
   }, [])
 
   // Scroll al fondo del log expandido cuando llegan nuevas líneas
@@ -67,55 +93,40 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings }: Prop
     }
   }, [log, logExpanded])
 
-  // Timer de turno: solo corre en fase 'roll' y sin busy
+  // Cada turno nuevo arranca con el tiempo completo
   useEffect(() => {
-    if (game.phase !== 'roll' || busy) {
-      if (timerRef.current) clearInterval(timerRef.current)
-      setTimeLeft(TURN_SECONDS)
-      return
-    }
+    turnMs.current = TURN_SECONDS * 1000
     setTimeLeft(TURN_SECONDS)
-    timerRef.current = setInterval(() => {
-      setTimeLeft((t) => {
-        if (t <= 1) {
-          if (timerRef.current) clearInterval(timerRef.current)
-          return 0
-        }
-        return t - 1
-      })
-    }, 1000)
-    // Cuenta regresiva: arranca justo cuando falta lo que dura el audio, así termina con el turno
-    const startedAt = performance.now()
-    const dur = timeoutDur
-    let handle: SfxHandle | null = null
-    const beep =
-      dur > 0 && dur < TURN_SECONDS
-        ? setTimeout(() => {
-            handle = play('timerout', { variant: 0 })
-          }, (TURN_SECONDS - dur) * 1000)
-        : null
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current)
-      if (beep) clearTimeout(beep)
-      // Si el turno termina antes, se corta; si venció el tiempo, se deja sonar hasta el final
-      if (handle && performance.now() - startedAt < TURN_SECONDS * 1000 - 300) handle.stop()
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [game.phase, game.current, busy, timeoutDur])
+  }, [game.current])
 
-  // Cuando el timer llega a 0, auto-tirar dados aleatorios
+  // Una oferta nueva arranca el reloj de quien la recibe (el del turno queda en pausa)
+  const tradeKey = game.trade ? `${game.trade.from}>${game.trade.to}` : ''
   useEffect(() => {
-    if (timeLeft === 0 && game.phase === 'roll' && !busy) {
-      void rollDice()
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [timeLeft])
+    tradeMs.current = TRADE_SECONDS * 1000
+    setTradeLeft(TRADE_SECONDS)
+  }, [tradeKey])
 
   const colors = Object.fromEntries(seats.map((s, i) => [s.id, PLAYER_COLORS[i % PLAYER_COLORS.length]]))
   const nameOf = (id: string) => seats.find((s) => s.id === id)?.name ?? id
   const me = currentPlayer(game)
   const tile = BOARD[me.position]
   const locked = busy || game.phase === 'over'
+
+  const addFloat = (player: string, amount: number) => {
+    const id = ++floatSeq.current
+    setFloats((l) => [...l, { id, player, amount }])
+    setTimeout(() => setFloats((l) => l.filter((f) => f.id !== id)), FLOAT_MS)
+  }
+
+  const openProp = (view: PropertyView) => {
+    play('cardtaken')
+    setProp(view)
+  }
+
+  const propInfo = (pos: number, mode: PropertyView['mode'], extra: Partial<PropertyView> = {}): PropertyView => {
+    const o = game.owned[pos]
+    return { pos, mode, ownerName: o ? nameOf(o.owner) : null, houses: o?.houses, mortgaged: o?.mortgaged, cash: me.cash, ...extra }
+  }
 
   const dispatch = async (action: Action, force = false) => {
     if (busy && !force) return
@@ -126,16 +137,31 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings }: Prop
     }
     setError(null)
     setBusy(true)
-    // Si sale una carta, el resultado (plata, fase, etc.) se muestra recién cuando se cierra la carta.
-    const hasCard = r.events.some((e) => e.type === 'card-drawn')
-    if (!hasCard) setGame(r.state)
+    setProp(null)
+    // Si sale una carta o hay que pagar un alquiler, el resultado (plata, fase, etc.) se muestra recién después.
+    let applied = false
+    const apply = () => {
+      if (!applied) {
+        applied = true
+        setGame(r.state)
+      }
+    }
+    if (!r.events.some((e) => e.type === 'card-drawn' || e.type === 'rent')) apply()
     for (const e of r.events) {
       if (!alive.current) return
       if (e.type === 'moved') {
-        if (e.steps > 0) play('Slice')
-        for (let k = 1; k <= e.steps; k++) {
-          setShown((p) => ({ ...p, [e.player]: (e.from + k) % 40 }))
-          await sleep(130)
+        if (e.steps > 0) {
+          const stepMs = Math.min(STEP_MS, MAX_MOVE_MS / e.steps)
+          const moveMs = e.steps * stepMs
+          // El sonido se acelera o frena para que dure lo mismo que el recorrido
+          const clip = knownDuration('Slice') * 1000
+          const rate = clip > 0 ? Math.min(2.2, Math.max(0.7, clip / moveMs)) : 1
+          const h = play('Slice', { rate })
+          for (let k = 1; k <= e.steps; k++) {
+            setShown((p) => ({ ...p, [e.player]: (e.from + k) % 40 }))
+            await sleep(stepMs)
+          }
+          h.stop(120) // si el sonido era más largo que el recorrido, se corta suave al llegar
         }
       } else if (e.type === 'jailed') {
         await sleep(250)
@@ -146,10 +172,13 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings }: Prop
         const negTimer = isNegativeCard(e.deck, e.cardId) ? setTimeout(() => play('neg'), 900) : null
         await showCard(e.deck, e.text)
         if (negTimer) clearTimeout(negTimer)
-        setGame(r.state)
+        apply()
         if (cardPaysPlayer(e.deck, e.cardId)) play('moneycollected')
+      } else if (e.type === 'rent') {
+        await showRent(e.tile, e.amount, nameOf(e.to))
+        apply()
       }
-      if (e.type === 'moved' && e.passedGo) play('moneycollected')
+      for (const c of moneyChanges(e, r.state.rules)) addFloat(c.player, c.amount)
       const sfx = sfxForEvent(e, action.player)
       if (sfx) {
         play(sfx)
@@ -160,9 +189,17 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings }: Prop
       const line = describeEvent(e, nameOf)
       if (line) setLog((l) => [...l, line])
     }
+    apply()
     if (alive.current) {
       setShown(Object.fromEntries(r.state.players.map((p) => [p.id, p.position])))
       setBusy(false)
+      // Cayó en una propiedad libre: la tarjeta sale de la casilla con la opción de comprar
+      if (r.state.phase === 'buy') {
+        const cur = r.state.players[r.state.current]
+        const pos = cur.position
+        const o = r.state.owned[pos]
+        openProp({ pos, mode: 'buy', ownerName: o ? nameOf(o.owner) : null, cash: cur.cash })
+      }
     }
   }
 
@@ -180,6 +217,20 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings }: Prop
       closeReveal.current = done
     })
 
+  /** Tarjeta de la propiedad donde se cayó, con el botón de pagar el alquiler (se paga sola si pasa el tiempo). */
+  const showRent = (pos: number, amount: number, ownerName: string) =>
+    new Promise<void>((resolve) => {
+      openProp({ pos, mode: 'pay', amount, ownerName, houses: game.owned[pos]?.houses, cash: me.cash })
+      const done = () => {
+        clearTimeout(timer)
+        payDone.current = null
+        setProp(null)
+        resolve()
+      }
+      const timer = setTimeout(done, PAY_SECONDS * 1000)
+      payDone.current = done
+    })
+
   const propose = (offer: TradeOffer) => {
     setTradeOpen(false)
     void dispatch({ type: 'proposeTrade', player: offer.from, to: offer.to, give: offer.give, get: offer.get })
@@ -190,6 +241,7 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings }: Prop
     if (busy) return
     const [a, b] = manual ? [clampDie(dice[0]), clampDie(dice[1])] : [d6(), d6()]
     setBusy(true)
+    setProp(null)
     const spin = setInterval(() => setRollFaces([d6(), d6()]), 85)
     setRollFaces([d6(), d6()])
     const started = performance.now()
@@ -202,7 +254,73 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings }: Prop
     await dispatch({ type: 'roll', player: me.id, dice: [a, b] }, true)
   }
 
-  const timerUrgent = timeLeft <= 10 && game.phase === 'roll' && !busy
+  /** Consultar una propiedad haciendo clic en su casilla (en cualquier momento, también fuera de turno). */
+  const inspect = (pos: number) => {
+    if (reveal || prop?.mode === 'pay') return
+    openProp(propInfo(pos, 'info', { cash: undefined }))
+  }
+
+  /** Tiempo agotado: se juega solo lo que falte para pasar el turno. */
+  const autoStep = async () => {
+    const g = live.current.game
+    const p = g.players[g.current]
+    if (g.phase === 'roll') await live.current.rollDice()
+    else if (g.phase === 'buy') await live.current.dispatch({ type: 'decline', player: p.id })
+    else if (g.phase === 'card') await live.current.dispatch({ type: 'drawCard', player: p.id })
+    else if (g.phase === 'end') await live.current.dispatch({ type: 'endTurn', player: p.id })
+  }
+
+  // Siempre las últimas versiones para el reloj (que corre fuera del ciclo de render)
+  const live = useRef({ game, busy, dispatch, rollDice, autoStep: autoStep })
+  live.current = { game, busy, dispatch, rollDice, autoStep }
+
+  // Reloj: corre durante todo el turno; en pausa mientras hay animaciones. Con una oferta abierta, corre el de quien la recibe.
+  useEffect(() => {
+    let last = performance.now()
+    const stopBeep = () => {
+      beep.current?.h.stop()
+      beep.current = null
+    }
+    const iv = setInterval(() => {
+      const now = performance.now()
+      const dt = now - last
+      last = now
+      const { game: g, busy: b } = live.current
+      if (g.phase === 'over' || b) return stopBeep()
+      const trade = !!g.trade
+      const ref = trade ? tradeMs : turnMs
+      ref.current = Math.max(0, ref.current - dt)
+      setTimeLeft(Math.ceil(turnMs.current / 1000))
+      setTradeLeft(Math.ceil(tradeMs.current / 1000))
+
+      // Cuenta regresiva: si se interrumpió (animación, otra oferta) retoma desde el punto que corresponde
+      const key = `${trade ? 'trade' : 'turn'}:${g.current}:${g.trade?.to ?? ''}`
+      const leadMs = TIMEROUT_LEAD_S * 1000
+      if (ref.current > 0 && ref.current <= leadMs) {
+        if (beep.current?.key !== key) {
+          stopBeep()
+          beep.current = { key, h: play('timerout', { variant: 0, startAt: (leadMs - ref.current) / 1000 }) }
+        }
+      } else if (beep.current && ref.current > leadMs) {
+        stopBeep() // el reloj se reinició (acción del jugador, oferta resuelta…)
+      }
+
+      if (ref.current <= 0 && !firing.current) {
+        firing.current = true
+        const act = trade ? live.current.dispatch({ type: 'rejectTrade', player: g.trade!.to }) : live.current.autoStep()
+        void act.finally(() => {
+          firing.current = false
+        })
+      }
+    }, 100)
+    return () => {
+      clearInterval(iv)
+      beep.current?.h.stop()
+      beep.current = null
+    }
+  }, [])
+
+  const timerUrgent = timeLeft <= 10 && !busy && !game.trade
   const shownLog = logExpanded ? log : log.slice(-3)
 
   return (
@@ -217,6 +335,16 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings }: Prop
         rollFaces={rollFaces}
         reveal={reveal}
         onCloseReveal={() => closeReveal.current?.()}
+        onTileClick={inspect}
+        property={
+          prop && {
+            ...prop,
+            onBuy: () => void dispatch({ type: 'buy', player: me.id }),
+            onDecline: () => void dispatch({ type: 'decline', player: me.id }),
+            onPay: () => payDone.current?.(),
+            onClose: () => setProp(null),
+          }
+        }
       />
 
       <aside className="side">
@@ -236,6 +364,13 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings }: Prop
                     {p.bankrupt && <em> · quebró</em>}
                   </span>
                   <span className="pcash">${p.cash}</span>
+                  {floats
+                    .filter((f) => f.player === p.id)
+                    .map((f) => (
+                      <span key={f.id} className={`mfloat ${f.amount > 0 ? 'gain' : 'loss'}`}>
+                        {f.amount > 0 ? '+' : '-'}${Math.abs(f.amount)} 🪙
+                      </span>
+                    ))}
                   {props.length > 0 && (
                     <span className="pprops">
                       {props.map(([pos]) => BOARD[Number(pos)].name).join(' · ')}
@@ -251,6 +386,7 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings }: Prop
           <section className="offer-banner">
             <h3>
               Oferta: {nameOf(game.trade.from)} → {nameOf(game.trade.to)}
+              <span className={`timer${tradeLeft <= 10 ? ' urgent' : ''}`}>⏱ {fmt(tradeLeft)}</span>
             </h3>
             <p>
               {nameOf(game.trade.from)} da <strong>{describeSide(game.trade.give)}</strong> y pide{' '}
@@ -282,9 +418,10 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings }: Prop
             <>
               <div className="turn-header">
                 <h3>Turno de {me.name}</h3>
-                {game.phase === 'roll' && !busy && (
-                  <span className={`timer${timerUrgent ? ' urgent' : ''}`}>{timeLeft}s</span>
-                )}
+                <span className={`timer${timerUrgent ? ' urgent' : ''}${game.trade ? ' paused' : ''}`} title={game.trade ? 'En pausa: responde la oferta' : 'Tiempo del turno'}>
+                  {game.trade ? '⏸ ' : ''}
+                  {fmt(timeLeft)}
+                </span>
               </div>
               <p className="muted">
                 Estás en {tile.name}
@@ -397,6 +534,7 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings }: Prop
           seats={seats}
           colors={colors}
           defaultFrom={me.id}
+          lockFrom
           onPropose={propose}
           onClose={() => setTradeOpen(false)}
         />

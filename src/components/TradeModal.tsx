@@ -10,6 +10,8 @@ interface Props {
   colors: Record<string, string>
   /** Quién propone por defecto (normalmente el jugador de turno) */
   defaultFrom: string
+  /** Solo puede ofrecer quien tiene el turno: no se puede cambiar quién ofrece */
+  lockFrom?: boolean
   onPropose: (offer: TradeOffer) => void
   onClose: () => void
 }
@@ -20,7 +22,7 @@ const toSide = (cash: string, props: number[], jailCards: number): TradeSide => 
   jailCards,
 })
 
-export default function TradeModal({ game, seats, colors, defaultFrom, onPropose, onClose }: Props) {
+export default function TradeModal({ game, seats, colors, defaultFrom, lockFrom = false, onPropose, onClose }: Props) {
   const alive = game.players.filter((p) => !p.bankrupt)
   const [from, setFrom] = useState(defaultFrom)
   const [to, setTo] = useState(alive.find((p) => p.id !== defaultFrom)?.id ?? '')
@@ -140,7 +142,7 @@ export default function TradeModal({ game, seats, colors, defaultFrom, onPropose
           <div className="trade-who">
             <label className="trade-field">
               Ofrece
-              <select className="input sm" value={from} onChange={(e) => changeFrom(e.target.value)}>
+              <select className="input sm" value={from} disabled={lockFrom} onChange={(e) => changeFrom(e.target.value)}>
                 {alive.map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.name}

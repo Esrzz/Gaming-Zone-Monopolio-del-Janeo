@@ -290,3 +290,40 @@ body {
 /* Dados girando mientras suena la tirada */
 .die.rolling { animation: dieshake 0.17s linear infinite; border-color: rgba(255, 255, 255, 0.75); }
 @keyframes dieshake { 0% { transform: rotate(-9deg) translateY(0); } 50% { transform: rotate(8deg) translateY(-3px); } 100% { transform: rotate(-9deg) translateY(0); } }
+
+/* ---------- Tarjeta de propiedad ---------- */
+.cardfx.pfx { container-type: size; }
+.pscene { width: min(310px, 58%); }
+.pcard3d { position: relative; width: 100%; transform-style: preserve-3d; animation: cardfly 0.95s var(--ease) both; }
+.pfront { position: relative; inset: auto; display: grid; align-content: start; justify-items: stretch; gap: 0; padding: 0; overflow: hidden; background: #fbf7ff; color: #1b1033; border: 2px solid rgba(255, 255, 255, 0.6); }
+.pback { border: 2px solid rgba(255, 255, 255, 0.5); }
+.pband { display: grid; gap: 2px; padding: 12px 14px 10px; text-align: center; color: #140b2b; text-shadow: 0 1px 0 rgba(255, 255, 255, 0.25); }
+.pkicker { font: 700 0.68rem var(--display); letter-spacing: 0.2em; text-transform: uppercase; opacity: 0.8; }
+.pname { margin: 0; font: 700 clamp(1rem, 1.7vw, 1.3rem) / 1.15 var(--display); text-wrap: balance; }
+.pbody { display: grid; gap: 7px; padding: 10px 14px 6px; justify-items: center; }
+.picon { width: 40px; height: 40px; border-radius: 9px; object-fit: cover; }
+.pprice { margin: 0; font-size: 0.86rem; }
+.pprice strong { font: 700 1.05rem var(--display); }
+.pdesc { margin: 0; font-size: 0.78rem; line-height: 1.35; text-align: center; color: #4b3a78; font-style: italic; }
+.prent { list-style: none; margin: 0; padding: 0; width: 100%; display: grid; gap: 2px; }
+.prent li { display: flex; justify-content: space-between; gap: 10px; padding: 3px 7px; border-radius: 6px; font-size: 0.8rem; }
+.prent li:nth-child(odd) { background: rgba(124, 58, 237, 0.07); }
+.prent li.now { background: rgba(124, 58, 237, 0.28); outline: 1px solid rgba(124, 58, 237, 0.6); }
+.powner { margin: 0; font-size: 0.8rem; }
+.pactions { display: grid; gap: 7px; padding: 8px 14px 14px; text-align: center; }
+.pactions .card-skip { color: #6b5a99; opacity: 1; }
+.pnote { margin: 0; font-size: 0.75rem; color: #b42318; }
+.pactions .btn.ghost { color: #3d2a73; border-color: rgba(61, 42, 115, 0.35); }
+.pay { background: linear-gradient(135deg, #e5484d, #b4232a) !important; }
+.tile.clickable { cursor: pointer; }
+.tile.clickable:hover { background: rgba(124, 58, 237, 0.2); }
+.token .avatar { width: 100% !important; height: 100% !important; }
+
+/* ---------- Plata flotante en la lista de jugadores ---------- */
+.plist li { position: relative; }
+.mfloat { position: absolute; right: 4px; top: -2px; z-index: 6; pointer-events: none; font: 800 1.05rem var(--display); text-shadow: 0 2px 8px rgba(0, 0, 0, 0.7); animation: mfloat 1.7s cubic-bezier(0.2, 0.7, 0.3, 1) both; white-space: nowrap; }
+.mfloat.gain { color: #4ade80; }
+.mfloat.loss { color: #ff6b6b; }
+@keyframes mfloat { 0% { opacity: 0; transform: translateY(10px) scale(0.8); } 15% { opacity: 1; transform: translateY(-6px) scale(1.15); } 80% { opacity: 1; } 100% { opacity: 0; transform: translateY(-34px) scale(1); } }
+.timer.paused { opacity: 0.6; }
+.offer-banner h3 { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
