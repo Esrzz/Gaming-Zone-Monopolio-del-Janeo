@@ -36,8 +36,10 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings }: Prop
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   useEffect(() => {
+    document.body.style.overflow = 'hidden'
     alive.current = true
     return () => {
+      document.body.style.overflow = ''
       alive.current = false
     }
   }, [])

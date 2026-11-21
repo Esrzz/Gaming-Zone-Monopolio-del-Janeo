@@ -17,7 +17,8 @@
 }
 
 * { box-sizing: border-box; margin: 0; }
-html { color-scheme: dark; }
+html { color-scheme: dark; overflow-x: hidden; }
+body { overflow-x: hidden; }
 body {
   background: var(--void);
   color: var(--text);
