@@ -7,172 +7,167 @@ import type { Card } from './types'
 export const CHANCE_CARDS: Card[] = [
   {
     id: 'ch-01',
-    text: 'Avanzá a la Salida. Cobrá $200.',
+    text: '¡Te convertiste en el miembro más activo del server! Cobrá $200.',
     effect: { kind: 'move', to: 0 },
   },
   {
     id: 'ch-02',
-    text: 'Avanzá a YouTube. Si pasás por la Salida, cobrá $200.',
+    text: 'Te hiciste viral en YouTube. Avanzá hasta YouTube. Si pasás por la Salida, cobrá $200.',
     effect: { kind: 'move', to: 5 },
   },
   {
     id: 'ch-03',
-    text: 'Avanzá a Twitch. Si pasás por la Salida, cobrá $200.',
+    text: 'Te contrataron para hacer streams. Avanzá hasta Twitch. Si pasás por la Salida, cobrá $200.',
     effect: { kind: 'move', to: 25 },
   },
   {
     id: 'ch-04',
-    text: 'Avanzá a Steam. Si pasás por la Salida, cobrá $200.',
+    text: 'Conseguiste un patrocinio gamer. Avanzá hasta Steam. Si pasás por la Salida, cobrá $200.',
     effect: { kind: 'move', to: 35 },
   },
   {
     id: 'ch-05',
-    text: 'Avanzá al servicio más cercano. Si es de otro, pagá 10x los dados.',
+    text: 'El bot te manda a revisar el servicio más cercano. Si pertenece a otro jugador, pagale 10x el resultado de los dados.',
     effect: { kind: 'moveToNearest', tileKind: 'utility' },
   },
   {
     id: 'ch-06',
-    text: 'Avanzá a la plataforma más cercana. Si es de otro, pagá el doble.',
+    text: 'Te invitaron a la plataforma más cercana. Si pertenece a otro jugador, pagale el doble del alquiler.',
     effect: { kind: 'moveToNearest', tileKind: 'platform' },
   },
   {
     id: 'ch-07',
-    text: 'El banco te recompensa por una buena racha. Cobrá $150.',
+    text: 'El Discord reconoce tu actividad y te recompensa. Cobrá $150 del Discord.',
     effect: { kind: 'collectFromBank', amount: 150 },
   },
   {
     id: 'ch-08',
-    text: 'Carta de Salida de la Cárcel. Guardala para cuando la necesites.',
+    text: 'Un moderador te perdonó la sanción. Guardá esta carta para salir de la cárcel.',
     effect: { kind: 'getOutOfJail' },
   },
   {
     id: 'ch-09',
-    text: 'Retrocedé 3 casillas.',
+    text: 'Te equivocaste de canal y terminaste en cualquier lado. Retrocedé 3 casillas.',
     effect: { kind: 'moveRelative', steps: -3 },
   },
   {
     id: 'ch-10',
-    text: 'Andá a la cárcel. No pases por la Salida, no cobrés $200.',
+    text: 'Te banearon por romper las reglas. Andá a la cárcel. No pases por la Salida, no cobrés $200.',
     effect: { kind: 'goToJail' },
   },
   {
     id: 'ch-11',
-    text: 'Reparaciones generales: pagá $25 por cada casa y $100 por cada hotel.',
+    text: 'El mantenimiento del servidor salió más caro de lo esperado. Pagá $25 por cada casa y $100 por cada hotel al Discord.',
     effect: { kind: 'repairs', houseCost: 25, hotelCost: 100 },
   },
   {
     id: 'ch-12',
-    text: 'Pagá $15 de multa.',
+    text: 'Te denunciaron por spam. Pagá $15 de multa al Discord.',
     effect: { kind: 'payBank', amount: 15 },
   },
   {
     id: 'ch-13',
-    text: 'Avanzá al #1 del ranking de juegos del server. Si pasás por la Salida, cobrá $200.',
+    text: '¡Sos el rey del gaming! Avanzá al #1 del ranking de juegos del server. Si pasás por la Salida, cobrá $200.',
     effect: { kind: 'move', to: 39 },
   },
   {
     id: 'ch-14',
-    text: 'Ganaste un torneo. Cobrá $100 de cada jugador.',
+    text: 'Ganaste el torneo oficial del Discord. Cada jugador te paga $100.',
     effect: { kind: 'collectFromPlayers', amount: 100 },
   },
   {
     id: 'ch-15',
-    text: 'Se te acumuló la suscripción. Pagá $50 al banco.',
+    text: 'Te olvidaste de cancelar Discord Nitro. Pagá $50 al Discord.',
     effect: { kind: 'payBank', amount: 50 },
   },
   {
     id: 'ch-16',
-    text: 'Avanzá a Spotify. Si pasás por la Salida, cobrá $200.',
+    text: 'Tu playlist se volvió la favorita del canal de música. Avanzá hasta Spotify. Si pasás por la Salida, cobrá $200.',
     effect: { kind: 'move', to: 15 },
   },
 ]
-
-/**
- * Mazo de Arca Comunal (16 cartas, estilo Monopoly clásico con tema gaming).
- */
 export const CHEST_CARDS: Card[] = [
   {
     id: 'cc-01',
-    text: 'Avanzá a la Salida. Cobrá $200.',
+    text: 'Volviste a conectarte después de meses. ¡El server te recibe con $200! Avanzá a la Salida.',
     effect: { kind: 'move', to: 0 },
   },
   {
     id: 'cc-02',
-    text: 'Error bancario a tu favor. Cobrá $200.',
+    text: 'El administrador se equivocó al configurar los permisos y te transfirió dinero. Cobrá $200 del Discord.',
     effect: { kind: 'collectFromBank', amount: 200 },
   },
   {
     id: 'cc-03',
-    text: 'Pagás la factura de internet. Pagá $50 al banco.',
+    text: 'Se cayó el internet justo en medio de una partida. Pagá $50 al Discord por los gastos de reconexión.',
     effect: { kind: 'payBank', amount: 50 },
   },
   {
     id: 'cc-04',
-    text: 'El server te manda merch. Cobrá $50.',
+    text: 'Te llegó el paquete de merch oficial del Discord. ¡Cobrá $50!',
     effect: { kind: 'collectFromBank', amount: 50 },
   },
   {
     id: 'cc-05',
-    text: 'Carta de Salida de la Cárcel. Guardala para cuando la necesites.',
+    text: 'Un administrador te levantó el ban. Guardá esta carta para salir de la cárcel.',
     effect: { kind: 'getOutOfJail' },
   },
   {
     id: 'cc-06',
-    text: 'Andá a la cárcel. No pases por la Salida, no cobrés $200.',
+    text: 'Te descubrieron usando cheats en el servidor. ¡Ban permanente! Andá a la cárcel. No pases por la Salida, no cobrés $200.',
     effect: { kind: 'goToJail' },
   },
   {
     id: 'cc-07',
-    text: 'Es tu cumple. Cada jugador te da $50.',
+    text: '¡Es tu cumpleaños! Los miembros del Discord te hacen una colecta. Cada jugador te da $50.',
     effect: { kind: 'collectFromPlayers', amount: 50 },
   },
   {
     id: 'cc-08',
-    text: 'Te reintegraron el pago de un juego. Cobrá $100.',
+    text: 'Te devolvieron el dinero de un juego que compraste por error. Cobrá $100.',
     effect: { kind: 'collectFromBank', amount: 100 },
   },
   {
     id: 'cc-09',
-    text: 'Ganaste la lotería del server. Cobrá $100.',
+    text: 'Ganaste un sorteo organizado por el Discord. Cobrá $100.',
     effect: { kind: 'collectFromBank', amount: 100 },
   },
   {
     id: 'cc-10',
-    text: 'Reparaciones generales: pagá $40 por cada casa y $115 por cada hotel.',
+    text: 'Tu setup necesita mantenimiento. Pagá $40 por cada casa y $115 por cada hotel al Discord.',
     effect: { kind: 'repairs', houseCost: 40, hotelCost: 115 },
   },
   {
     id: 'cc-11',
-    text: 'Cobrás dividendos de tus inversiones. Cobrá $50.',
+    text: 'Tus inversiones en el server dieron resultado. Cobrá $50 en dividendos.',
     effect: { kind: 'collectFromBank', amount: 50 },
   },
   {
     id: 'cc-12',
-    text: 'Pagás honorarios médicos. Pagá $100 al banco.',
+    text: 'Te quedaste sin voz después de una noche entera gritando en el voice. Pagá $100 al Discord por honorarios médicos.',
     effect: { kind: 'payBank', amount: 100 },
   },
   {
     id: 'cc-13',
-    text: 'Pagás impuesto a la herencia. Pagá $100 al banco.',
+    text: 'No cancelaste Discord Nitro y se renovó automáticamente. Pagá $100 al Discord.',
     effect: { kind: 'payBank', amount: 100 },
   },
   {
     id: 'cc-14',
-    text: 'Cobrás el sueldo atrasado. Cobrá $20.',
+    text: 'Te pagaron el alquiler de un juego que prestaste a otro miembro. Cobrá $20.',
     effect: { kind: 'collectFromBank', amount: 20 },
   },
   {
     id: 'cc-15',
-    text: 'Ganás un concurso de juego. Cobrá $10.',
+    text: 'Ganaste el concurso de memes del Discord. Cobrá $10.',
     effect: { kind: 'collectFromBank', amount: 10 },
   },
   {
     id: 'cc-16',
-    text: 'Cobrás intereses sobre un préstamo. Cobrá $25.',
+    text: 'Un miembro te devolvió un préstamo que le habías hecho. Cobrá $25.',
     effect: { kind: 'collectFromBank', amount: 25 },
   },
 ]
-
 export function getCard(deck: 'chance' | 'chest', index: number) {
   const cards = deck === 'chance' ? CHANCE_CARDS : CHEST_CARDS
   return cards[index % cards.length]

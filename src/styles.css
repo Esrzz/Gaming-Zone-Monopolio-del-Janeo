@@ -17,8 +17,8 @@
 }
 
 * { box-sizing: border-box; margin: 0; }
-html { color-scheme: dark; overflow-x: hidden; }
-body { overflow-x: hidden; }
+html, body { height: 100%; overflow: hidden; }
+html { color-scheme: dark; }
 body {
   background: var(--void);
   color: var(--text);
@@ -105,7 +105,7 @@ body {
 .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 
 /* ---------- Partida ---------- */
-.stage.wide { place-content: start; justify-items: stretch; padding: 0; gap: 0; min-height: 100svh; }
+.stage.wide { place-content: start; justify-items: stretch; padding: 0; gap: 0; height: calc(100svh - 60px); }
 .game {
   display: grid;
   grid-template-columns: 1fr 280px;
