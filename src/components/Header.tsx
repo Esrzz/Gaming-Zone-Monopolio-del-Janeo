@@ -6,9 +6,10 @@ interface Props {
   canDev: boolean
   devMode: boolean
   onToggleDev: (on: boolean) => void
+  onSettings: () => void
 }
 
-export default function Header({ name, avatar, canDev, devMode, onToggleDev }: Props) {
+export default function Header({ name, avatar, canDev, devMode, onToggleDev, onSettings }: Props) {
   return (
     <header className="topbar">
       <div className="topbar-brand">
@@ -27,6 +28,9 @@ export default function Header({ name, avatar, canDev, devMode, onToggleDev }: P
             <i aria-hidden="true" />
           </label>
         )}
+        <button className="topbar-settings" onClick={onSettings} aria-label="Configuraciones">
+          ⚙
+        </button>
         <div className="topbar-user">
           <Avatar name={name} src={avatar} size={32} />
           <strong>{name}</strong>

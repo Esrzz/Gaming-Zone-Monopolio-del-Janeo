@@ -17,10 +17,11 @@ const TURN_SECONDS = 60
 interface Props {
   seats: Seat[]
   onExit: () => void
+  onSettings: () => void
 }
 
 /** Partida local de prueba: el developer tira los dados de todos los turnos. */
-export default function DevGame({ seats, onExit }: Props) {
+export default function DevGame({ seats, onExit, onSettings }: Props) {
   const [game, setGame] = useState<GameState>(() => createGame(seats.map((s) => ({ id: s.id, name: s.name }))))
   const [shown, setShown] = useState<Record<string, number>>(() => Object.fromEntries(seats.map((s) => [s.id, 0])))
   const [busy, setBusy] = useState(false)
@@ -272,6 +273,9 @@ export default function DevGame({ seats, onExit }: Props) {
 
         <button className="link" onClick={onExit}>
           Salir de la partida de prueba
+        </button>
+        <button className="link" onClick={onSettings} aria-label="Configuraciones">
+          ⚙ Configuraciones
         </button>
       </aside>
     </div>

@@ -4,11 +4,13 @@ import AuroraBackground from './components/AuroraBackground'
 import Avatar from './components/Avatar'
 import DevGame from './components/DevGame'
 import Header from './components/Header'
+import SettingsModal from './components/SettingsModal'
 import type { Seat } from './components/Board'
 import { isDevId } from './lib/dev'
 import { findAvatar, NAME_MAX, validName } from './lib/profile'
+import { useAudio } from './lib/useAudio'
 
-type Screen = 'name' | 'menu' | 'play' | 'join' | 'host' | 'settings' | 'devgame'
+type Screen = 'name' | 'menu' | 'play' | 'join' | 'host' | 'devgame'
 
 interface Profile {
   id: string | null
@@ -30,6 +32,9 @@ export default function App() {
   const [devMode, setDevMode] = useState(false)
   const [devPlayers, setDevPlayers] = useState(3)
   const [seats, setSeats] = useState<Seat[]>([])
+  const [settingsOpen, setSettingsOpen] = useState(false)
+
+  const { prefs, setMusicVolume, setSfxVolume, setTrack, startMusic } = useAudio()
 
   const match = findAvatar(draft)
   const canDev = isDevId(profile?.id)
@@ -40,6 +45,8 @@ export default function App() {
     const m = findAvatar(draft)
     setProfile({ id: m?.id ?? null, name: m?.name ?? draft.trim(), avatar: m?.avatar ?? null })
     setDevMode(false)
+    // Arranca la música en la primera interacción del usuario
+    startMusic()
     setScreen('menu')
   }
 
@@ -58,8 +65,28 @@ export default function App() {
     <>
       <AuroraBackground />
       {profile && screen !== 'name' && (
-        <Header name={profile.name} avatar={profile.avatar} canDev={canDev} devMode={devMode} onToggleDev={toggleDev} />
+        <Header
+          name={profile.name}
+          avatar={profile.avatar}
+          canDev={canDev}
+          devMode={devMode}
+          onToggleDev={toggleDev}
+          onSettings={() => setSettingsOpen(true)}
+        />
       )}
+
+      {settingsOpen && (
+        <SettingsModal
+          musicVolume={prefs.musicVolume}
+          sfxVolume={prefs.sfxVolume}
+          trackIndex={prefs.trackIndex}
+          onMusicVolume={setMusicVolume}
+          onSfxVolume={setSfxVolume}
+          onTrack={setTrack}
+          onClose={() => setSettingsOpen(false)}
+        />
+      )}
+
       <main className={`stage ${screen === 'devgame' ? 'wide' : ''}`}>
         {screen !== 'devgame' && (
           <header className="brandline">
@@ -85,7 +112,7 @@ export default function App() {
               />
             </div>
             <p className="hint" aria-live="polite">
-              {match ? `Te encontré: ${match.name}` : ' '}
+              {match ? `Te encontré: ${match.name}` : ' '}
             </p>
             <button className="btn primary" type="submit" disabled={!validName(draft)}>
               Continuar
@@ -100,7 +127,7 @@ export default function App() {
                 <button className="btn primary" onClick={() => setScreen('play')}>
                   Jugar
                 </button>
-                <button className="btn ghost" onClick={() => setScreen('settings')}>
+                <button className="btn ghost" onClick={() => setSettingsOpen(true)}>
                   Configuraciones
                 </button>
                 <button className="link" onClick={() => setScreen('name')}>
@@ -172,19 +199,16 @@ export default function App() {
                 </button>
               </div>
             )}
-
-            {screen === 'settings' && (
-              <div className="stack">
-                <p className="muted">Configuraciones: pendiente de definir.</p>
-                <button className="link" onClick={() => setScreen('menu')}>
-                  Volver
-                </button>
-              </div>
-            )}
           </div>
         )}
 
-        {screen === 'devgame' && <DevGame seats={seats} onExit={() => setScreen('menu')} />}
+        {screen === 'devgame' && (
+          <DevGame
+            seats={seats}
+            onExit={() => setScreen('menu')}
+            onSettings={() => setSettingsOpen(true)}
+          />
+        )}
       </main>
     </>
   )
