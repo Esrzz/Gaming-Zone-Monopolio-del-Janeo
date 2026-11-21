@@ -12,7 +12,7 @@ Juego tipo Monopoly online para la comunidad de Gaming Zone. Estética tomada de
   prueba": partida local de 2 a 6 jugadores donde el dev tira los dados de todos los turnos (con opción de dados manuales).
   Usa el motor real y un tablero provisorio (`src/components/Board.tsx`).
 - Casillas: las 22 calles son los juegos más jugados del server (más horas = más cara). Las 4 plataformas son
-  Discord, Spotify, Twitch y Steam; los 2 servicios son Mute y Deafen. Los íconos de plataformas y servicios
+  YouTube, Spotify, Twitch y Steam; los 2 servicios son Mute y Deafen. Los íconos de plataformas y servicios
   son genéricos: se reemplazan por los oficiales en `public/icons/` (mismo nombre de archivo).
 - Para actualizar el ranking de horas: `node scripts/ranking.mjs ruta/al/stats.json` o con la URL del worker
   (`node scripts/ranking.mjs https://<worker>/stats.json`). Escribe `src/data/ranking.json`.

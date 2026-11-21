@@ -16,7 +16,7 @@ export type RentTable = [number, number, number, number, number, number]
 export type Tile =
   | { kind: 'go'; name: string }
   | { kind: 'property'; name: string; group: GroupId; price: number; rent: RentTable; houseCost: number; icon?: string | null }
-  /** Casillas de plataformas (las estaciones del Monopoly clásico): 25/50/100/200 según cuántas tengas */
+  /** Casillas de plataformas (las estaciones del Monopoly clásico): ver `Rules.platformRent` */
   | { kind: 'platform'; name: string; price: number; icon?: string | null }
   /** Casillas de servicio (Mute y Deafen): alquiler 4x o 10x los dados */
   | { kind: 'utility'; name: string; price: number; icon?: string | null }
@@ -36,8 +36,10 @@ export interface Rules {
   maxJailTurns: number
   /** Dobles seguidos que mandan a la cárcel */
   doublesToJail: number
-  /** Alquiler doble si tenés todo el grupo de color sin casas */
-  doubleRentOnFullSet: boolean
+  /** Multiplicador del alquiler base si tenés todo el grupo de color y sin casas (oficial: 2) */
+  fullSetMultiplier: number
+  /** Alquiler de las plataformas según cuántas tenga el dueño: [1, 2, 3, 4] */
+  platformRent: number[]
   /** Variante: los impuestos van a un pozo que se cobra al caer en Estacionamiento */
   freeParkingJackpot: boolean
 }

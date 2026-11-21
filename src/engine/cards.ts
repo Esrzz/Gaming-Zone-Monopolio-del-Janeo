@@ -12,7 +12,7 @@ export const CHANCE_CARDS: Card[] = [
   },
   {
     id: 'ch-02',
-    text: 'Avanzá a Discord. Si pasás por la Salida, cobrá $200.',
+    text: 'Avanzá a YouTube. Si pasás por la Salida, cobrá $200.',
     effect: { kind: 'move', to: 5 },
   },
   {

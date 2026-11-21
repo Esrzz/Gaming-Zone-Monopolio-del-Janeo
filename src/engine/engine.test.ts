@@ -69,7 +69,7 @@ describe('asignación de juegos', () => {
     for (let i = 1; i < h.length; i++) expect(h[i]).toBeGreaterThanOrEqual(h[i - 1])
   })
   it('plataformas y servicios', () => {
-    expect([5, 15, 25, 35].map((i) => BOARD[i].name)).toEqual(['Discord', 'Spotify', 'Twitch', 'Steam'])
+    expect([5, 15, 25, 35].map((i) => BOARD[i].name)).toEqual(['YouTube', 'Spotify', 'Twitch', 'Steam'])
     expect([12, 28].map((i) => BOARD[i].name)).toEqual(['Mute', 'Deafen'])
   })
 })
@@ -149,8 +149,22 @@ describe('alquileres', () => {
     expect(s.phase).toBe('end')
   })
 
-  it('duplica con el grupo completo y sin casas', () => {
+  it('triplica con el grupo completo y sin casas', () => {
     const s = give(newGame(), [1, 3], B)
+    expect(computeRent(s, 3)).toBe(12)
+    const three = give(newGame(), [6, 8, 9], B)
+    expect(computeRent(three, 9)).toBe(24)
+  })
+
+  it('con el grupo incompleto cobra el alquiler base', () => {
+    expect(computeRent(give(newGame(), [6, 8], B), 6)).toBe(6)
+    // un grupo completo repartido entre dos jugadores tampoco multiplica
+    const split = give(give(newGame(), [6, 8], B), [9], A)
+    expect(computeRent(split, 6)).toBe(6)
+  })
+
+  it('el multiplicador del grupo es configurable (oficial: doble)', () => {
+    const s = give(newGame({ fullSetMultiplier: 2 }), [1, 3], B)
     expect(computeRent(s, 3)).toBe(8)
   })
 
@@ -168,11 +182,16 @@ describe('alquileres', () => {
     expect(player(own, A).cash).toBe(1500)
   })
 
-  it('plataformas: 25, 50, 100, 200', () => {
-    expect(computeRent(give(newGame(), [5], B), 5)).toBe(25)
-    expect(computeRent(give(newGame(), [5, 15], B), 5)).toBe(50)
-    expect(computeRent(give(newGame(), [5, 15, 25], B), 5)).toBe(100)
+  it('plataformas: 50, 100, 150, 200 según cuántas tenga el dueño', () => {
+    expect(computeRent(give(newGame(), [5], B), 5)).toBe(50)
+    expect(computeRent(give(newGame(), [5, 15], B), 5)).toBe(100)
+    expect(computeRent(give(newGame(), [5, 15, 25], B), 5)).toBe(150)
     expect(computeRent(give(newGame(), [5, 15, 25, 35], B), 5)).toBe(200)
+  })
+
+  it('las plataformas de otro dueño no suman', () => {
+    const s = give(give(newGame(), [5], B), [15, 25], A)
+    expect(computeRent(s, 5)).toBe(50)
   })
 
   it('servicios: 4x o 10x los dados', () => {
@@ -220,9 +239,9 @@ describe('cárcel', () => {
     // Lo más simple: usar casillas de propiedad directamente con setPos.
     // Desde pos=0: 1+1=2(arca), así que mejor empezar desde 3.
     let s = setPos(newGame(), A, 3) // start en brown
-    // primer doble: 3+2=5 → Discord (plataforma libre)
+    // primer doble: 3+2=5 → YouTube (plataforma libre)
     s = run(s, roll(A, 1, 1)).state // 3+2 = 5
-    // casilla 5 es Discord (plataforma libre) → fase buy
+    // casilla 5 es YouTube (plataforma libre) → fase buy
     s = run(s, { type: 'decline', player: A }).state
     expect(s.phase).toBe('roll')
     // segundo doble: 5+4 = 9 → lightblue (propiedad libre)

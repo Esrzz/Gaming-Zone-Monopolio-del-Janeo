@@ -8,7 +8,8 @@ export const DEFAULT_RULES: Rules = {
   jailFine: 50,
   maxJailTurns: 3,
   doublesToJail: 3,
-  doubleRentOnFullSet: true,
+  fullSetMultiplier: 3,
+  platformRent: [50, 100, 150, 200],
   freeParkingJackpot: false,
 }
 
@@ -61,11 +62,12 @@ export function computeRent(s: GameState, position: number): number {
   if (tile.kind === 'property') {
     if (o.houses > 0) return tile.rent[o.houses]
     const full = groupPositions(tile.group).every(ownedBy)
-    return full && s.rules.doubleRentOnFullSet ? tile.rent[0] * 2 : tile.rent[0]
+    return full ? tile.rent[0] * s.rules.fullSetMultiplier : tile.rent[0]
   }
   if (tile.kind === 'platform') {
     const n = positionsOfKind('platform').filter(ownedBy).length
-    return 25 * 2 ** (n - 1)
+    const table = s.rules.platformRent
+    return table[Math.min(n, table.length) - 1]
   }
   if (tile.kind === 'utility') {
     const n = positionsOfKind('utility').filter(ownedBy).length

@@ -44,7 +44,7 @@ const FIXED: Record<number, Tile> = {
   2: { kind: 'chest', name: 'Arca comunal' },
   4: { kind: 'tax', name: 'Impuesto a las ganancias', amount: 200 },
   // Plataformas vinculadas a servicios externos (los íconos se pueden reemplazar en public/icons/)
-  5: platform('Discord', '/icons/discord.svg'),
+  5: platform('YouTube', '/icons/youtube.svg'),
   7: { kind: 'chance', name: 'Suerte' },
   10: { kind: 'jail', name: 'Cárcel' },
   12: utility('Mute', '/icons/mic-off.svg'),
