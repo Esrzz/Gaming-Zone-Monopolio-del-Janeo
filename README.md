@@ -70,3 +70,9 @@ su texto (se cierra con un clic o a los 4,5 s) y recién ahí se aplica el efect
 - **Tarjeta de propiedad**: al caer en una propiedad sale de la casilla con su info; libre → Comprar / No comprar, ajena → Pagar. Cualquier casilla comprable se puede consultar con un clic, también fuera de turno.
 - **Descripciones**: en `src/engine/board.ts`, cada elemento de `STREET_SLOTS` acepta `description: '...'` (y `platform(nombre, icono, descripcion)` / `utility(...)`); la tarjeta la muestra.
 - **Mazos**: se barajan al crear la partida (el orden queda guardado en el estado, así que el motor sigue siendo determinista). `createGame(jugadores, reglas, random)` acepta un `random` propio para que el servidor decida el orden.
+
+## Gestionar propiedades y dados
+
+- **Gestionar** (en tu turno, antes o después de tirar): construir casas/hotel, venderlas (a la mitad) e hipotecar (el banco paga la mitad del precio; levantar la hipoteca cuesta el valor + 10%). Reglas del Monopoly original: hace falta el barrio completo sin hipotecas, se construye y vende parejo, y hay 32 casas y 12 hoteles (`housesTotal` / `hotelsTotal` en las reglas). Para hipotecar hay que vender antes las casas del barrio.
+- Casas, hoteles e hipotecas se ven en el tablero. Una propiedad con casas no se puede intercambiar.
+- **Dados**: tienen puntos; un clic los tira (en tu turno) y un clic durante la animación la acelera. El movimiento de la ficha es más lento y el sonido `Slice` se ajusta a su duración.

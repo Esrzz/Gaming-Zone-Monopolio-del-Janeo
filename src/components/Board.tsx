@@ -3,6 +3,7 @@ import type { GameState, Tile } from '../engine'
 import { GRID_TEMPLATE, GROUP_COLORS, TOKEN_SIZE, gridCell, sideOf, tokenSlot } from '../lib/layout'
 import Avatar from './Avatar'
 import CardReveal from './CardReveal'
+import Die from './Die'
 import PropertyCard from './PropertyCard'
 import type { PropertyView } from './PropertyCard'
 
@@ -24,6 +25,12 @@ interface Props {
   /** Carta que se está mostrando (animación de robo) */
   /** Números al azar que se muestran en los dados mientras suena la tirada */
   rollFaces?: [number, number] | null
+  /** Clic en los dados: tirar (si es el turno y toca tirar) o acelerar la animación en curso */
+  onDiceClick?: () => void
+  /** Qué hace un clic en los dados ahora: 'roll' = tirar, 'skip' = acelerar, null = nada */
+  diceAction?: 'roll' | 'skip' | null
+  /** Duración de cada paso de ficha en ms (para que la animación CSS vaya al mismo ritmo) */
+  stepMs?: number
   reveal?: { deck: 'chance' | 'chest'; text: string } | null
   onCloseReveal?: () => void
   /** Clic en una casilla comprable (consultar su información) */
@@ -52,14 +59,14 @@ function label(t: Tile): string {
   }
 }
 
-export default function Board({ game, seats, shown, colors, drawable = null, onDraw, rollFaces = null, reveal = null, onCloseReveal, onTileClick, property = null }: Props) {
+export default function Board({ game, seats, shown, colors, drawable = null, onDraw, rollFaces = null, onDiceClick, diceAction = null, stepMs = 130, reveal = null, onCloseReveal, onTileClick, property = null }: Props) {
   const tokens = seats.filter((s) => !game.players.find((p) => p.id === s.id)?.bankrupt)
   const perTile: Record<number, number> = {}
   for (const s of tokens) perTile[shown[s.id] ?? 0] = (perTile[shown[s.id] ?? 0] ?? 0) + 1
   const slot: Record<number, number> = {}
 
   return (
-    <div className="board-wrap">
+    <div className="board-wrap" style={{ ['--step-ms' as string]: `${stepMs}ms` }}>
       <div className="gboard" style={{ gridTemplateColumns: GRID_TEMPLATE, gridTemplateRows: GRID_TEMPLATE }}>
         {BOARD.map((t, i) => {
           const { row, col } = gridCell(i)
@@ -70,7 +77,7 @@ export default function Board({ game, seats, shown, colors, drawable = null, onD
           return (
             <div
               key={i}
-              className={`tile side-${sideOf(i)} k-${t.kind}${info ? ' clickable' : ''}`}
+              className={`tile side-${sideOf(i)} k-${t.kind}${info ? ' clickable' : ''}${o?.mortgaged ? ' mortgaged' : ''}`}
               onClick={info && onTileClick ? () => onTileClick(i) : undefined}
               style={{
                 gridRow: row,
@@ -83,20 +90,32 @@ export default function Board({ game, seats, shown, colors, drawable = null, onD
               {icon && <img className="ticon" src={icon} alt="" loading="lazy" onError={(e) => (e.currentTarget.style.display = 'none')} />}
               <span className="tname">{t.name}</span>
               <span className="tprice">{label(t)}</span>
-              {o && o.houses > 0 && <span className="houses">{o.houses === 5 ? 'H' : o.houses}</span>}
+              {o && o.houses > 0 && (
+                <span className="bld" aria-label={o.houses === 5 ? 'Hotel' : `${o.houses} casas`}>
+                  {o.houses === 5 ? <i className="hotel" /> : Array.from({ length: o.houses }, (_, k) => <i key={k} />)}
+                </span>
+              )}
+              {o?.mortgaged && <span className="mtag">Hipotecada</span>}
             </div>
           )
         })}
 
         <div className="center">
           <h2>Monopolio del janeo</h2>
-          <div className="dice" aria-label="Dados">
+          <div
+            className={`dice${diceAction ? ' clickable' : ''}${diceAction === 'roll' ? ' ready' : ''}`}
+            aria-label="Dados"
+            role={diceAction ? 'button' : undefined}
+            tabIndex={diceAction ? 0 : undefined}
+            data-nosound
+            onClick={diceAction ? onDiceClick : undefined}
+            onKeyDown={diceAction ? (e) => (e.key === 'Enter' || e.key === ' ') && onDiceClick?.() : undefined}
+          >
             {(rollFaces ?? game.lastDice ?? [0, 0]).map((d, i) => (
-              <span key={i} className={`die${rollFaces ? ' rolling' : ''}`}>
-                {d || '–'}
-              </span>
+              <Die key={i} value={d} rolling={!!rollFaces} />
             ))}
           </div>
+          <p className="dice-hint">{diceAction === 'roll' ? 'Tocá los dados para tirar' : diceAction === 'skip' ? 'Tocá para acelerar' : ''}</p>
           {game.rules.freeParkingJackpot && <p className="muted">Pozo: ${game.pot}</p>}
 
           <button
@@ -148,12 +167,10 @@ export default function Board({ game, seats, shown, colors, drawable = null, onD
               left: `${c.x}%`,
               top: `${c.y}%`,
               width: `${TOKEN_SIZE}%`,
-              height: `${TOKEN_SIZE}%`,
-              transform: 'translate(-50%, -50%)',
-              boxShadow: `0 0 0 3px ${colors[s.id]}, 0 4px 12px rgba(0,0,0,.5)`,
+              ['--c' as string]: colors[s.id],
             }}
           >
-            <Avatar name={s.name} src={s.avatar} size={40} />
+            <Avatar name={s.name} src={s.avatar} size={48} />
           </span>
         )
       })}

@@ -9,6 +9,7 @@ const A = 'a'
 const B = 'b'
 const C = 'c'
 
+const noShuffle = () => 0.999999 // sin mezclar: mazos en el orden de la lista (tests deterministas)
 const newGame = (rules = {}) =>
   createGame(
     [
@@ -16,6 +17,7 @@ const newGame = (rules = {}) =>
       { id: B, name: 'Beto' },
     ],
     rules,
+    noShuffle,
   )
 
 function run(s: GameState, action: Action): { state: GameState; events: GameEvent[] } {
@@ -320,11 +322,15 @@ describe('bancarrota', () => {
   })
 
   it('con tres jugadores, la partida sigue y se saltea al quebrado', () => {
-    let s = createGame([
-      { id: A, name: 'Ana' },
-      { id: B, name: 'Beto' },
-      { id: C, name: 'Cami' },
-    ])
+    let s = createGame(
+      [
+        { id: A, name: 'Ana' },
+        { id: B, name: 'Beto' },
+        { id: C, name: 'Cami' },
+      ],
+      {},
+      noShuffle,
+    )
     s = run(s, { type: 'bankrupt', player: A }).state
     expect(s.phase).toBe('roll')
     expect(currentPlayer(s).id).toBe(B)

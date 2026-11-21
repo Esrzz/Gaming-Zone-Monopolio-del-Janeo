@@ -29,7 +29,13 @@ export function isNegativeCard(deck: 'chance' | 'chest', cardId: string): boolea
 export function sfxForEvent(e: GameEvent, viewer: string): SfxName | null {
   switch (e.type) {
     case 'bought':
+    case 'built':
       return 'Cardbought'
+    case 'sold-house':
+    case 'mortgaged':
+      return 'moneycollected'
+    case 'unmortgaged':
+      return 'moneypaid'
     case 'jailed':
       return 'Jail'
     case 'bankrupt':

@@ -21,6 +21,16 @@ export function moneyChanges(e: GameEvent, rules: Rules): MoneyChange[] {
     case 'bought':
       add(e.player, -e.price)
       break
+    case 'built':
+      add(e.player, -e.cost)
+      break
+    case 'unmortgaged':
+      add(e.player, -e.cost)
+      break
+    case 'sold-house':
+    case 'mortgaged':
+      add(e.player, e.amount)
+      break
     case 'moved':
       if (e.passedGo) add(e.player, rules.goSalary)
       break

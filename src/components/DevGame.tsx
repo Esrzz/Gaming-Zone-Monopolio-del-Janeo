@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
-import { BOARD, applyAction, createGame, currentPlayer, isBuyable, priceOf } from '../engine'
+import { BOARD, applyAction, createGame, currentPlayer, isBuyable, isManageAction, priceOf } from '../engine'
 import type { Action, GameState, TradeOffer } from '../engine'
 import { describeEvent, describeSide } from '../lib/describe'
 import { PLAYER_COLORS } from '../lib/layout'
 import Avatar from './Avatar'
 import Board from './Board'
 import type { Seat } from './Board'
+import ManageModal from './ManageModal'
 import TradeModal from './TradeModal'
 import type { PropertyView } from './PropertyCard'
 import { cardPaysPlayer, isNegativeCard, sfxForEvent } from '../lib/sfxEvents'
@@ -26,8 +27,10 @@ const CARD_SECONDS = 8
 /** Tiempo para pagar un alquiler en la tarjeta de propiedad (si no, se paga solo) */
 const PAY_SECONDS = 10
 /** Duración de cada paso de ficha, y tope del recorrido completo (los largos van más rápido) */
-const STEP_MS = 130
-const MAX_MOVE_MS = 2400
+const STEP_MS = 220
+const MAX_MOVE_MS = 3800
+/** Con "acelerar" (clic en los dados) cada paso dura esto */
+const FAST_STEP_MS = 35
 const FLOAT_MS = 1800
 /**
  * Segundos que faltan cuando suena el primer tick de la cuenta regresiva. El audio tiene un tick por segundo
@@ -65,6 +68,13 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings }: Prop
   const [prop, setProp] = useState<PropertyView | null>(null)
   const [floats, setFloats] = useState<Floating[]>([])
   const [tradeOpen, setTradeOpen] = useState(false)
+  const [manageOpen, setManageOpen] = useState(false)
+  const [moving, setMoving] = useState(false)
+  const [stepMs, setStepMs] = useState(STEP_MS)
+  /** Clic en los dados mientras anima: acelera el resto de la animación */
+  const fast = useRef(false)
+  const diceSound = useRef<SfxHandle | null>(null)
+  const moveSound = useRef<SfxHandle | null>(null)
   const [rollFaces, setRollFaces] = useState<[number, number] | null>(null)
   const closeReveal = useRef<(() => void) | null>(null)
   const payDone = useRef<(() => void) | null>(null)
@@ -95,6 +105,7 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings }: Prop
 
   // Cada turno nuevo arranca con el tiempo completo
   useEffect(() => {
+    setManageOpen(false)
     turnMs.current = TURN_SECONDS * 1000
     setTimeLeft(TURN_SECONDS)
   }, [game.current])
@@ -130,6 +141,7 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings }: Prop
 
   const dispatch = async (action: Action, force = false) => {
     if (busy && !force) return
+    if (!force) fast.current = false
     const r = applyAction(game, action)
     if (!r.ok) {
       setError(r.error)
@@ -137,7 +149,7 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings }: Prop
     }
     setError(null)
     setBusy(true)
-    setProp(null)
+    if (!isManageAction(action)) setProp(null)
     // Si sale una carta o hay que pagar un alquiler, el resultado (plata, fase, etc.) se muestra recién después.
     let applied = false
     const apply = () => {
@@ -151,17 +163,22 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings }: Prop
       if (!alive.current) return
       if (e.type === 'moved') {
         if (e.steps > 0) {
-          const stepMs = Math.min(STEP_MS, MAX_MOVE_MS / e.steps)
-          const moveMs = e.steps * stepMs
+          const step = Math.min(STEP_MS, MAX_MOVE_MS / e.steps)
+          const moveMs = e.steps * step
           // El sonido se acelera o frena para que dure lo mismo que el recorrido
           const clip = knownDuration('Slice') * 1000
-          const rate = clip > 0 ? Math.min(2.2, Math.max(0.7, clip / moveMs)) : 1
-          const h = play('Slice', { rate })
+          const rate = clip > 0 ? Math.min(2.2, Math.max(0.6, clip / moveMs)) : 1
+          setStepMs(step)
+          setMoving(true)
+          const h = (moveSound.current = fast.current ? null : play('Slice', { rate }))
           for (let k = 1; k <= e.steps; k++) {
+            if (fast.current) setStepMs(FAST_STEP_MS)
             setShown((p) => ({ ...p, [e.player]: (e.from + k) % 40 }))
-            await sleep(stepMs)
+            await sleep(fast.current ? FAST_STEP_MS : step)
           }
-          h.stop(120) // si el sonido era más largo que el recorrido, se corta suave al llegar
+          setMoving(false)
+          h?.stop(120) // si el sonido era más largo que el recorrido, se corta suave al llegar
+          moveSound.current = null
         }
       } else if (e.type === 'jailed') {
         await sleep(250)
@@ -242,19 +259,33 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings }: Prop
     const [a, b] = manual ? [clampDie(dice[0]), clampDie(dice[1])] : [d6(), d6()]
     setBusy(true)
     setProp(null)
+    fast.current = false
     const spin = setInterval(() => setRollFaces([d6(), d6()]), 85)
     setRollFaces([d6(), d6()])
     const started = performance.now()
-    await play('Dados').ended
+    const h = (diceSound.current = play('Dados'))
+    await h.ended // termina con el sonido, o antes si se hace clic en los dados
+    diceSound.current = null
     const rest = 700 - (performance.now() - started) // mínimo de animación si no hay audio
-    if (rest > 0) await sleep(rest)
+    if (rest > 0 && !fast.current) await sleep(rest)
     clearInterval(spin)
     if (!alive.current) return
     setRollFaces(null)
+    fast.current = false // acelerar los dados no acelera también la ficha
     await dispatch({ type: 'roll', player: me.id, dice: [a, b] }, true)
   }
 
-  /** Consultar una propiedad haciendo clic en su casilla (en cualquier momento, también fuera de turno). */
+  /** Clic en los dados: tira (si toca) o acelera la animación en curso (tirada o movimiento de ficha). */
+  const diceClick = () => {
+    if (rollFaces || moving) {
+      fast.current = true
+      diceSound.current?.stop(150)
+      moveSound.current?.stop(100)
+    } else if (!busy && game.phase === 'roll') void rollDice()
+  }
+  const diceAction: 'roll' | 'skip' | null = rollFaces || moving ? 'skip' : !busy && game.phase === 'roll' ? 'roll' : null
+
+  /** Consultar una propiedad haciendo clic clic en su casilla (en cualquier momento, también fuera de turno). */
   const inspect = (pos: number) => {
     if (reveal || prop?.mode === 'pay') return
     openProp(propInfo(pos, 'info', { cash: undefined }))
@@ -329,6 +360,9 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings }: Prop
         game={game}
         seats={seats}
         shown={shown}
+        stepMs={stepMs}
+        diceAction={diceAction}
+        onDiceClick={diceClick}
         colors={colors}
         drawable={game.phase === 'card' && !busy ? game.pendingCard?.deck ?? null : null}
         onDraw={() => void dispatch({ type: 'drawCard', player: me.id })}
@@ -494,9 +528,14 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings }: Prop
 
               {error && <p className="err">{error}</p>}
 
-              <button className="btn ghost sm" disabled={locked || !!game.trade} onClick={() => setTradeOpen(true)}>
-                🤝 Intercambiar
-              </button>
+              <div className="row-btns">
+                <button className="btn ghost sm" disabled={locked} onClick={() => setManageOpen(true)}>
+                  🏗️ Gestionar
+                </button>
+                <button className="btn ghost sm" disabled={locked || !!game.trade} onClick={() => setTradeOpen(true)}>
+                  🤝 Intercambiar
+                </button>
+              </div>
 
               <button
                 className="link danger"
@@ -527,6 +566,17 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings }: Prop
           Salir de la partida de prueba
         </button>
       </aside>
+
+      {manageOpen && (
+        <ManageModal
+          game={game}
+          playerId={me.id}
+          playerName={me.name}
+          disabled={busy}
+          onAction={(a) => void dispatch(a)}
+          onClose={() => setManageOpen(false)}
+        />
+      )}
 
       {tradeOpen && (
         <TradeModal

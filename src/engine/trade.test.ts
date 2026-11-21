@@ -12,7 +12,7 @@ const newGame = () =>
     { id: A, name: 'Ana' },
     { id: B, name: 'Beto' },
     { id: C, name: 'Cami' },
-  ])
+  ], {}, () => 0.999999) // sin mezclar los mazos: tests deterministas
 
 const side = (p: Partial<TradeSide> = {}): TradeSide => ({ ...emptySide(), ...p })
 

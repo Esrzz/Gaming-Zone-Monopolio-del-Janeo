@@ -137,8 +137,7 @@ body {
 .center { grid-area: 2 / 2 / 11 / 11; display: grid; place-content: center; justify-items: center; gap: 18px; }
 .center h2 { font: 700 clamp(1.2rem, 3vw, 2.2rem) var(--display); text-align: center; text-wrap: balance; }
 .dice { display: flex; gap: 14px; }
-.die { display: grid; place-items: center; width: 56px; height: 56px; border-radius: 14px; border: 1px solid rgba(196, 181, 253, 0.45); background: rgba(124, 58, 237, 0.2); font: 700 1.8rem var(--display); }
-.token { position: absolute; z-index: 5; display: grid; border-radius: 50%; transition: left 0.13s linear, top 0.13s linear; pointer-events: none; }
+.token { position: absolute; z-index: 5; display: grid; box-sizing: border-box; aspect-ratio: 1 / 1; padding: 3px; border-radius: 50%; background: var(--c, #fff); border: 2px solid #fff; transform: translate(-50%, -50%); box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.6), 0 6px 14px rgba(0, 0, 0, 0.65); transition: left var(--step-ms, 130ms) linear, top var(--step-ms, 130ms) linear; pointer-events: none; }
 
 .side { display: flex; flex-direction: column; gap: 8px; height: calc(100svh - 60px); overflow-y: auto; scrollbar-width: thin; padding: 8px; }
 .panel-card { display: grid; gap: 8px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); }
@@ -317,7 +316,7 @@ body {
 .pay { background: linear-gradient(135deg, #e5484d, #b4232a) !important; }
 .tile.clickable { cursor: pointer; }
 .tile.clickable:hover { background: rgba(124, 58, 237, 0.2); }
-.token .avatar { width: 100% !important; height: 100% !important; }
+.token .avatar { width: 100% !important; height: 100% !important; font-size: clamp(0.7rem, 1.5vw, 1.1rem) !important; box-shadow: none; overflow: hidden; border-radius: 50%; }
 
 /* ---------- Plata flotante en la lista de jugadores ---------- */
 .plist li { position: relative; }
@@ -327,3 +326,43 @@ body {
 @keyframes mfloat { 0% { opacity: 0; transform: translateY(10px) scale(0.8); } 15% { opacity: 1; transform: translateY(-6px) scale(1.15); } 80% { opacity: 1; } 100% { opacity: 0; transform: translateY(-34px) scale(1); } }
 .timer.paused { opacity: 0.6; }
 .offer-banner h3 { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+
+/* ---------- Dados con puntos ---------- */
+.die { position: relative; display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr); place-items: center; width: 58px; height: 58px; padding: 8px; border-radius: 15px; border: 1px solid rgba(255, 255, 255, 0.85); background: linear-gradient(145deg, #ffffff, #e4dcf7); box-shadow: 0 6px 16px rgba(0, 0, 0, 0.45), inset 0 -3px 5px rgba(90, 60, 160, 0.25); font-size: 0; }
+.pip { width: 11px; height: 11px; border-radius: 50%; background: transparent; }
+.pip.on { background: radial-gradient(circle at 35% 30%, #4a3a78, #140b2b); box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.6); }
+.pip.on.one { width: 15px; height: 15px; background: radial-gradient(circle at 35% 30%, #ff6b6b, #c01f2a); }
+.dice.clickable .die { cursor: pointer; }
+.dice.clickable:hover .die { transform: translateY(-3px) rotate(-3deg); }
+.dice.ready .die { animation: dieready 1.2s ease-in-out infinite; }
+@keyframes dieready { 50% { transform: translateY(-5px); box-shadow: 0 12px 20px rgba(0, 0, 0, 0.5), 0 0 18px rgba(167, 139, 250, 0.85); } }
+.dice-hint { margin: -6px 0 0; font-size: 0.78rem; color: var(--muted); text-align: center; min-height: 1em; }
+.die { transition: transform 0.15s ease; }
+
+/* ---------- Gestionar propiedades ---------- */
+.mg-summary { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 12px; padding: 8px 12px; border-radius: 12px; background: rgba(124, 58, 237, 0.1); font-size: 0.9rem; }
+.mg-list { display: grid; gap: 10px; max-height: 58vh; overflow-y: auto; padding-right: 4px; }
+.mg-group { display: grid; gap: 4px; padding: 6px; border: 1px solid var(--line); border-radius: 12px; background: rgba(124, 58, 237, 0.05); }
+.mg-row { display: grid; grid-template-columns: 10px minmax(0, 1fr) auto auto; align-items: center; gap: 10px; padding: 4px 6px; }
+.mg-row.mortgaged .mg-name { opacity: 0.55; }
+.mg-dot { width: 10px; height: 26px; border-radius: 4px; }
+.mg-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.mg-name em { font-weight: 400; color: var(--idle); }
+.mg-built { font-size: 0.85rem; letter-spacing: -2px; white-space: nowrap; }
+.mg-actions { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.mg-note { margin: 12px 0 0; font-size: 0.8rem; }
+
+/* ---------- Casas, hoteles e hipotecas en el tablero ---------- */
+.bld { position: absolute; z-index: 2; display: flex; gap: 2px; pointer-events: none; }
+.side-bottom .bld { top: 2px; left: 0; right: 0; justify-content: center; }
+.side-top .bld { bottom: 2px; left: 0; right: 0; justify-content: center; }
+.side-left .bld { right: 2px; top: 0; bottom: 0; flex-direction: column; justify-content: center; }
+.side-right .bld { left: 2px; top: 0; bottom: 0; flex-direction: column; justify-content: center; }
+.bld i { display: block; width: 9px; height: 9px; border-radius: 2px; background: #35e08a; box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.55); }
+.bld i.hotel { width: 15px; background: #ff4d4d; }
+.tile.mortgaged { background: repeating-linear-gradient(135deg, rgba(120, 120, 140, 0.25) 0 6px, rgba(40, 30, 70, 0.3) 6px 12px); }
+.tile.mortgaged .tname, .tile.mortgaged .tprice, .tile.mortgaged .ticon { opacity: 0.45; }
+.tile .mtag { position: absolute; left: 0; right: 0; bottom: 3px; font: 700 clamp(0.42rem, 0.7vw, 0.58rem) var(--display); letter-spacing: 0.1em; text-transform: uppercase; color: #ffb4b4; }
+
+.row-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.row-btns .btn { display: flex; align-items: center; justify-content: center; gap: 6px; white-space: nowrap; }

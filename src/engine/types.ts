@@ -40,6 +40,9 @@ export interface Rules {
   fullSetMultiplier: number
   /** Alquiler de las plataformas según cuántas tenga el dueño: [1, 2, 3, 4] */
   platformRent: number[]
+  /** Casas y hoteles que hay en el banco al empezar (oficial: 32 y 12) */
+  housesTotal: number
+  hotelsTotal: number
   /** Variante: los impuestos van a un pozo que se cobra al caer en Estacionamiento */
   freeParkingJackpot: boolean
 }
@@ -140,6 +143,11 @@ export type Action =
   | { type: 'acceptTrade'; player: PlayerId }
   | { type: 'rejectTrade'; player: PlayerId }
   | { type: 'cancelTrade'; player: PlayerId }
+  /** Gestión de propiedades (solo en tu turno): construir una casa/hotel, venderla, hipotecar y levantar la hipoteca */
+  | { type: 'build'; player: PlayerId; tile: number }
+  | { type: 'sellHouse'; player: PlayerId; tile: number }
+  | { type: 'mortgage'; player: PlayerId; tile: number }
+  | { type: 'unmortgage'; player: PlayerId; tile: number }
 
 /** Eventos que la interfaz usa para animar (movimiento de fichas, avisos, chat de sistema). */
 export type GameEvent =
@@ -150,6 +158,10 @@ export type GameEvent =
   | { type: 'rent'; from: PlayerId; to: PlayerId; tile: number; amount: number }
   | { type: 'paid'; from: PlayerId; to: PlayerId | 'bank' | 'pot'; amount: number }
   | { type: 'jackpot'; player: PlayerId; amount: number }
+  | { type: 'built'; player: PlayerId; tile: number; houses: number; cost: number }
+  | { type: 'sold-house'; player: PlayerId; tile: number; houses: number; amount: number }
+  | { type: 'mortgaged'; player: PlayerId; tile: number; amount: number }
+  | { type: 'unmortgaged'; player: PlayerId; tile: number; cost: number }
   | { type: 'jailed'; player: PlayerId }
   | { type: 'left-jail'; player: PlayerId; how: 'doubles' | 'fine' | 'card' | 'forced' }
   | { type: 'card-pending'; player: PlayerId; deck: 'chance' | 'chest' }

@@ -33,6 +33,16 @@ export function describeEvent(e: GameEvent, name: (id: string) => string): strin
       return null
     case 'jackpot':
       return `${name(e.player)} se llevó el pozo: ${money(e.amount)}`
+    case 'built':
+      return e.houses === 5
+        ? `${name(e.player)} construyó un hotel en ${BOARD[e.tile].name} (${money(e.cost)})`
+        : `${name(e.player)} construyó una casa en ${BOARD[e.tile].name} (${e.houses}/4) por ${money(e.cost)}`
+    case 'sold-house':
+      return `${name(e.player)} vendió ${e.houses === 4 ? 'el hotel' : 'una casa'} de ${BOARD[e.tile].name} y cobró ${money(e.amount)}`
+    case 'mortgaged':
+      return `${name(e.player)} hipotecó ${BOARD[e.tile].name} y cobró ${money(e.amount)}`
+    case 'unmortgaged':
+      return `${name(e.player)} levantó la hipoteca de ${BOARD[e.tile].name} por ${money(e.cost)}`
     case 'jailed':
       return `${name(e.player)} va a la cárcel`
     case 'left-jail': {

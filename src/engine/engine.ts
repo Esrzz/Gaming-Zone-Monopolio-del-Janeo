@@ -1,6 +1,7 @@
 import { BOARD, BOARD_SIZE, JAIL_POSITION, groupPositions, isBuyable, positionsOfKind, priceOf } from './board'
 import { CHANCE_CARDS, CHEST_CARDS } from './cards'
 import type { Action, Card, GameEvent, GameState, Phase, PlayerId, PlayerState, Result, Rules } from './types'
+import { applyManageAction, isManageAction } from './manage'
 import { applyTradeAction, cancelTradeOf, isTradeAction } from './trade'
 
 export const DEFAULT_RULES: Rules = {
@@ -11,6 +12,8 @@ export const DEFAULT_RULES: Rules = {
   doublesToJail: 3,
   fullSetMultiplier: 3,
   platformRent: [50, 100, 150, 200],
+  housesTotal: 32,
+  hotelsTotal: 12,
   freeParkingJackpot: false,
 }
 
@@ -124,6 +127,12 @@ export function applyAction(prev: GameState, action: Action): Result {
   // Los intercambios se responden en cualquier momento; proponerlos solo se puede en tu turno (ver trade.ts).
   if (isTradeAction(action)) {
     const error = applyTradeAction(s, ev, action)
+    return error ? fail(error) : { ok: true, state: s, events: ev }
+  }
+
+  // Construir e hipotecar: solo en tu turno (ver manage.ts)
+  if (isManageAction(action)) {
+    const error = applyManageAction(s, ev, action)
     return error ? fail(error) : { ok: true, state: s, events: ev }
   }
 
@@ -442,7 +451,8 @@ function goBankrupt(s: GameState, ev: GameEvent[], p: PlayerState, creditor: Pla
   p.inJail = false
   for (const [pos, o] of Object.entries(s.owned)) {
     if (o.owner !== p.id) continue
-    if (creditor) s.owned[Number(pos)] = { ...o, owner: creditor.id }
+    // Las casas y hoteles vuelven al banco; las propiedades pasan al acreedor (o al banco)
+    if (creditor) s.owned[Number(pos)] = { ...o, owner: creditor.id, houses: 0 }
     else delete s.owned[Number(pos)]
   }
   if (creditor) creditor.jailCards += p.jailCards
