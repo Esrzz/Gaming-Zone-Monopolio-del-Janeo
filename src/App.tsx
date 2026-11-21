@@ -206,7 +206,6 @@ export default function App() {
           <DevGame
             seats={seats}
             onExit={() => setScreen('menu')}
-            onSettings={() => setSettingsOpen(true)}
           />
         )}
       </main>

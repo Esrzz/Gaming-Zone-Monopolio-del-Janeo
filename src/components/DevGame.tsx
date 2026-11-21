@@ -17,11 +17,10 @@ const TURN_SECONDS = 60
 interface Props {
   seats: Seat[]
   onExit: () => void
-  onSettings: () => void
 }
 
 /** Partida local de prueba: el developer tira los dados de todos los turnos. */
-export default function DevGame({ seats, onExit, onSettings: _onSettings }: Props) {
+export default function DevGame({ seats, onExit }: Props) {
   const [game, setGame] = useState<GameState>(() => createGame(seats.map((s) => ({ id: s.id, name: s.name }))))
   const [shown, setShown] = useState<Record<string, number>>(() => Object.fromEntries(seats.map((s) => [s.id, 0])))
   const [busy, setBusy] = useState(false)
@@ -36,10 +35,7 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings }: Prop
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   useEffect(() => {
-    alive.current = true
-    return () => {
-      alive.current = false
-    }
+    return () => { alive.current = false }
   }, [])
 
   // Scroll al fondo del log expandido cuando llegan nuevas líneas

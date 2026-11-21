@@ -92,9 +92,10 @@ body {
 .switch input { position: absolute; opacity: 0; width: 0; height: 0; }
 .switch i { position: relative; width: 38px; height: 22px; border-radius: 999px; background: rgba(124, 58, 237, 0.2); border: 1px solid var(--line); transition: background 0.25s; }
 .switch i::after { content: ''; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: var(--orchid); transition: transform 0.25s var(--ease); }
+/* switch: input:checked ~ span no funciona (span está antes en el DOM); se usa :has() */
 .switch input:checked + i { background: var(--violet); }
 .switch input:checked + i::after { transform: translateX(16px); background: #fff; }
-.switch input:checked ~ span, .switch:has(input:checked) { color: var(--text); }
+.switch:has(input:checked) { color: var(--text); }
 .switch input:focus-visible + i { outline: 2px solid var(--orchid); outline-offset: 3px; }
 
 .devbox { display: grid; gap: 12px; margin-top: 8px; padding: 16px; border-radius: 14px; border: 1px dashed rgba(53, 232, 224, 0.45); background: rgba(53, 232, 224, 0.05); }
@@ -104,7 +105,7 @@ body {
 .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 
 /* ---------- Partida ---------- */
-.stage.wide { place-content: start; justify-items: stretch; padding: 0; gap: 0; min-height: 100svh; }
+.stage.wide { place-content: start; justify-items: stretch; padding: 0; gap: 0; min-height: 100svh; overflow: visible; }
 .game {
   display: grid;
   grid-template-columns: 1fr 280px;
@@ -121,7 +122,7 @@ body {
 }
 .gboard { position: absolute; inset: 0; display: grid; border: 1px solid var(--line); border-radius: 0; overflow: hidden; background: rgba(14, 7, 34, 0.7); backdrop-filter: blur(10px); }
 .tile { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-width: 0; min-height: 0; padding: 4px; border: 1px solid var(--line); text-align: center; overflow: hidden; background: rgba(124, 58, 237, 0.05); }
-.tname { font: 600 clamp(0.52rem, 1.05vw, 0.78rem) / 1.1 var(--display); overflow-wrap: anywhere; }
+.tname { font: 600 clamp(0.52rem, 1.05vw, 0.78rem) / 1.1 var(--display); overflow-wrap: anywhere; hyphens: auto; }
 .tprice { font-size: clamp(0.5rem, 0.9vw, 0.7rem); color: var(--muted); }
 .ticon { width: clamp(16px, 2.3vw, 30px); height: clamp(16px, 2.3vw, 30px); border-radius: 6px; object-fit: cover; }
 .strip { position: absolute; }
@@ -168,6 +169,7 @@ body {
 .log.log-expanded { max-height: 300px; overflow-y: auto; scrollbar-width: thin; }
 .err { color: #ff8a88; font-size: 0.9rem; }
 .link.danger { color: #ff8a88; }
+.link.danger:hover { color: #ff6b68; }
 .link:disabled { opacity: 0.4; cursor: not-allowed; }
 
 /* Ajustes: texto de las casillas laterales y fichas */
@@ -175,7 +177,6 @@ body {
 .side-right { padding-left: calc(16% + 4px); }
 .side-top { padding-bottom: calc(16% + 2px); }
 .side-bottom { padding-top: calc(16% + 2px); }
-.tname { hyphens: auto; }
 .k-go .tname, .k-jail .tname, .k-parking .tname, .k-gotojail .tname { font-size: clamp(0.62rem, 1.15vw, 0.85rem); }
 
 /* Carta de Suerte / Arca Comunal */
