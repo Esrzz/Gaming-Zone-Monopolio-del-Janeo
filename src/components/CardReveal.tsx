@@ -6,7 +6,7 @@ interface Props {
 
 /** Carta que sale del mazo, se da vuelta y muestra su texto. Se cierra con un clic. */
 export default function CardReveal({ deck, text, onClose }: Props) {
-  const title = deck === 'chance' ? 'Suerte' : 'Arca comunal'
+  const title = deck === 'chance' ? 'Suerte' : 'Arcas del discord'
   return (
     <div className="cardfx" onClick={onClose} role="dialog" aria-label={`Carta de ${title}`}>
       <div className="scene3d">

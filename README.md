@@ -52,5 +52,13 @@ Hay una sola oferta abierta a la vez. Cada lado puede dar plata, propiedades y c
 
 ## Cartas
 
-Al caer en Suerte o Arca comunal hay que hacer clic en el mazo del tablero: la carta sale, se da vuelta y muestra
+Al caer en Suerte o Arcas del discord hay que hacer clic en el mazo del tablero: la carta sale, se da vuelta y muestra
 su texto (se cierra con un clic o a los 4,5 s) y recién ahí se aplica el efecto.
+
+## Audio
+
+- **Música**: cualquier `.mp3/.ogg/.wav/.m4a` en `public/audio/Music/` aparece sola en Configuraciones → Audio.
+- **Efectos**: una carpeta por efecto en `public/audio/Efectos/<Nombre>/`; si hay varias variantes se elige una al azar.
+  Nombres usados: `Cardbought`, `Dados`, `Jail`, `Lose`, `Slice`, `Victory`, `cardtaken`, `click`, `moneycollected`, `moneypaid`, `neg`, `timerout`.
+- La lista se genera con el plugin `vite-plugins/audioManifest.ts` (`/audio/manifest.json`), sin tocar código.
+- Los dados giran con números al azar hasta que termina el sonido `Dados`; `timerout` arranca cuando faltan tantos segundos como dura el audio (termina junto con el turno) y se corta si el turno acaba antes.

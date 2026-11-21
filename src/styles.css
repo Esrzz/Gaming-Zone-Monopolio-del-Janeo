@@ -286,3 +286,7 @@ body {
 .offer-banner p { margin: 0; font-size: 0.92rem; }
 .offer-banner .row3 { display: grid; grid-template-columns: 1fr 1fr auto; gap: 8px; }
 .btn.sm { padding: 0.5rem 0.9rem; font-size: 0.9rem; border-radius: 10px; }
+
+/* Dados girando mientras suena la tirada */
+.die.rolling { animation: dieshake 0.17s linear infinite; border-color: rgba(255, 255, 255, 0.75); }
+@keyframes dieshake { 0% { transform: rotate(-9deg) translateY(0); } 50% { transform: rotate(8deg) translateY(-3px); } 100% { transform: rotate(-9deg) translateY(0); } }

@@ -224,7 +224,7 @@ describe('impuestos y estacionamiento', () => {
 })
 
 describe('cárcel', () => {
-  it('casilla "Andá a la cárcel" te manda a la cárcel y corta los dobles', () => {
+  it('casilla "Banneo" te manda a la cárcel y corta los dobles', () => {
     let s = setPos(newGame(), A, 28)
     s = run(s, roll(A, 1, 1)).state // 30
     expect(player(s, A).inJail).toBe(true)

@@ -40,7 +40,7 @@ export function describeEvent(e: GameEvent, name: (id: string) => string): strin
       return `${name(e.player)} salió de la cárcel ${how[e.how]}`
     }
     case 'card-pending':
-      return `${name(e.player)} cayó en ${e.deck === 'chance' ? 'Suerte' : 'Arca comunal'}`
+      return `${name(e.player)} cayó en ${e.deck === 'chance' ? 'Suerte' : 'Arcas del discord'}`
     case 'card-drawn':
       return `🃏 ${name(e.player)}: "${e.text}"`
     case 'trade-proposed':

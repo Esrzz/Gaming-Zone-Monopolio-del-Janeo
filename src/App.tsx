@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import avatars from './data/avatars.json'
 import AuroraBackground from './components/AuroraBackground'
 import Avatar from './components/Avatar'
@@ -8,6 +8,7 @@ import SettingsModal from './components/SettingsModal'
 import type { Seat } from './components/Board'
 import { isDevId } from './lib/dev'
 import { findAvatar, NAME_MAX, validName } from './lib/profile'
+import { play as playSfx } from './lib/sfx'
 import { useAudio } from './lib/useAudio'
 
 type Screen = 'name' | 'menu' | 'play' | 'join' | 'host' | 'devgame'
@@ -34,7 +35,18 @@ export default function App() {
   const [seats, setSeats] = useState<Seat[]>([])
   const [settingsOpen, setSettingsOpen] = useState(false)
 
-  const { prefs, setMusicVolume, setSfxVolume, setTrack, startMusic } = useAudio()
+  const { prefs, tracks, setMusicVolume, setSfxVolume, setTrack, startMusic } = useAudio()
+
+  // Sonido de clic en cualquier botón habilitado (los botones con sonido propio lo evitan con data-nosound)
+  useEffect(() => {
+    const onClick = (e: MouseEvent) => {
+      const el = (e.target as HTMLElement | null)?.closest<HTMLElement>('button, a, [role="button"], input[type="checkbox"]')
+      if (!el || (el as HTMLButtonElement).disabled || el.hasAttribute('data-nosound')) return
+      playSfx('click')
+    }
+    document.addEventListener('click', onClick)
+    return () => document.removeEventListener('click', onClick)
+  }, [])
 
   const match = findAvatar(draft)
   const canDev = isDevId(profile?.id)
@@ -79,7 +91,8 @@ export default function App() {
         <SettingsModal
           musicVolume={prefs.musicVolume}
           sfxVolume={prefs.sfxVolume}
-          trackIndex={prefs.trackIndex}
+          tracks={tracks}
+          trackFile={prefs.trackFile}
           onMusicVolume={setMusicVolume}
           onSfxVolume={setSfxVolume}
           onTrack={setTrack}

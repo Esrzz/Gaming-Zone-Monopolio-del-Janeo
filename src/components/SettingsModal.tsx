@@ -1,22 +1,24 @@
 import { useState } from 'react'
-import { TRACKS } from '../lib/useAudio'
+import type { Track } from '../lib/audioManifest'
 
 type Tab = 'video' | 'audio' | 'jugabilidad' | 'otros'
 
 interface Props {
   musicVolume: number
   sfxVolume: number
-  trackIndex: number
+  tracks: Track[]
+  trackFile: string | null
   onMusicVolume: (v: number) => void
   onSfxVolume: (v: number) => void
-  onTrack: (i: number) => void
+  onTrack: (file: string) => void
   onClose: () => void
 }
 
 export default function SettingsModal({
   musicVolume,
   sfxVolume,
-  trackIndex,
+  tracks,
+  trackFile,
   onMusicVolume,
   onSfxVolume,
   onTrack,
@@ -89,16 +91,21 @@ export default function SettingsModal({
               <div className="setting-row">
                 <label className="setting-label">Canción de fondo</label>
                 <div className="track-list">
-                  {TRACKS.map((t, i) => (
-                    <button
-                      key={t.file}
-                      className={`track-btn${trackIndex === i ? ' active' : ''}`}
-                      onClick={() => onTrack(i)}
-                    >
-                      <span className="track-icon">{trackIndex === i ? '▶' : '♪'}</span>
-                      {t.label}
-                    </button>
-                  ))}
+                  {tracks.length === 0 && <p className="muted">No hay canciones en public/audio/Music.</p>}
+                  {tracks.map((t, i) => {
+                    const active = (trackFile ?? tracks[0].file) === t.file
+                    return (
+                      <button
+                        key={t.file}
+                        className={`track-btn${active ? ' active' : ''}`}
+                        onClick={() => onTrack(t.file)}
+                        data-index={i}
+                      >
+                        <span className="track-icon">{active ? '▶' : '♪'}</span>
+                        {t.label}
+                      </button>
+                    )
+                  })}
                 </div>
               </div>
             </div>

@@ -20,6 +20,8 @@ interface Props {
   drawable?: 'chance' | 'chest' | null
   onDraw?: () => void
   /** Carta que se está mostrando (animación de robo) */
+  /** Números al azar que se muestran en los dados mientras suena la tirada */
+  rollFaces?: [number, number] | null
   reveal?: { deck: 'chance' | 'chest'; text: string } | null
   onCloseReveal?: () => void
 }
@@ -44,7 +46,7 @@ function label(t: Tile): string {
   }
 }
 
-export default function Board({ game, seats, shown, colors, drawable = null, onDraw, reveal = null, onCloseReveal }: Props) {
+export default function Board({ game, seats, shown, colors, drawable = null, onDraw, rollFaces = null, reveal = null, onCloseReveal }: Props) {
   const tokens = seats.filter((s) => !game.players.find((p) => p.id === s.id)?.bankrupt)
   const slot: Record<number, number> = {}
 
@@ -79,8 +81,8 @@ export default function Board({ game, seats, shown, colors, drawable = null, onD
         <div className="center">
           <h2>Monopolio del janeo</h2>
           <div className="dice" aria-label="Dados">
-            {(game.lastDice ?? [0, 0]).map((d, i) => (
-              <span key={i} className="die">
+            {(rollFaces ?? game.lastDice ?? [0, 0]).map((d, i) => (
+              <span key={i} className={`die${rollFaces ? ' rolling' : ''}`}>
                 {d || '–'}
               </span>
             ))}
@@ -89,18 +91,18 @@ export default function Board({ game, seats, shown, colors, drawable = null, onD
 
           <button
             type="button"
-            className={`deck deck-chest${drawable === 'chest' ? ' ready' : ''}`}
+            data-nosound className={`deck deck-chest${drawable === 'chest' ? ' ready' : ''}`}
             disabled={drawable !== 'chest'}
             onClick={onDraw}
-            aria-label="Mazo de Arca comunal"
+            aria-label="Mazo de Arcas del discord"
           >
             <span className="deck-icon">📦</span>
-            <span className="deck-name">Arca comunal</span>
+            <span className="deck-name">Arcas del discord</span>
             {drawable === 'chest' && <span className="deck-hint">¡Sacá una carta!</span>}
           </button>
           <button
             type="button"
-            className={`deck deck-chance${drawable === 'chance' ? ' ready' : ''}`}
+            data-nosound className={`deck deck-chance${drawable === 'chance' ? ' ready' : ''}`}
             disabled={drawable !== 'chance'}
             onClick={onDraw}
             aria-label="Mazo de Suerte"

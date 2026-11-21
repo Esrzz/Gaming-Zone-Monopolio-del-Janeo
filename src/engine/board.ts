@@ -41,7 +41,7 @@ const utility = (name: string, icon: string): Tile => ({ kind: 'utility', name, 
 
 const FIXED: Record<number, Tile> = {
   0: { kind: 'go', name: 'Salida' },
-  2: { kind: 'chest', name: 'Arca comunal' },
+  2: { kind: 'chest', name: 'Arcas del discord' },
   4: { kind: 'tax', name: 'Impuesto a las ganancias', amount: 200 },
   // Plataformas vinculadas a servicios externos (los íconos se pueden reemplazar en public/icons/)
   5: platform('YouTube', '/icons/youtube.svg'),
@@ -49,16 +49,16 @@ const FIXED: Record<number, Tile> = {
   10: { kind: 'jail', name: 'Cárcel' },
   12: utility('Mute', '/icons/mic-off.svg'),
   15: platform('Spotify', '/icons/spotify.svg'),
-  17: { kind: 'chest', name: 'Arca comunal' },
+  17: { kind: 'chest', name: 'Arcas del discord' },
   20: { kind: 'parking', name: 'Estacionamiento libre' },
   22: { kind: 'chance', name: 'Suerte' },
   25: platform('Twitch', '/icons/twitch.svg'),
   28: utility('Deafen', '/icons/headphones-off.svg'),
-  30: { kind: 'gotojail', name: 'Andá a la cárcel' },
-  33: { kind: 'chest', name: 'Arca comunal' },
+  30: { kind: 'gotojail', name: 'Banneo' },
+  33: { kind: 'chest', name: 'Arcas del discord' },
   35: platform('Steam', '/icons/steam.svg'),
   36: { kind: 'chance', name: 'Suerte' },
-  38: { kind: 'tax', name: 'Impuesto al lujo', amount: 100 },
+  38: { kind: 'tax', name: 'Impuesto al carreo', amount: 100 },
 }
 
 export const BOARD: Tile[] = Array.from({ length: BOARD_SIZE }, (_, i): Tile => {

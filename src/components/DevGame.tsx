@@ -7,6 +7,9 @@ import Avatar from './Avatar'
 import Board from './Board'
 import type { Seat } from './Board'
 import TradeModal from './TradeModal'
+import { cardPaysPlayer, isNegativeCard, sfxForEvent } from '../lib/sfxEvents'
+import { durationOf, play } from '../lib/sfx'
+import type { SfxHandle } from '../lib/sfx'
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 const d6 = () => Math.floor(Math.random() * 6) + 1
@@ -35,6 +38,8 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings }: Prop
   const [timeLeft, setTimeLeft] = useState(TURN_SECONDS)
   const [reveal, setReveal] = useState<{ deck: 'chance' | 'chest'; text: string } | null>(null)
   const [tradeOpen, setTradeOpen] = useState(false)
+  const [rollFaces, setRollFaces] = useState<[number, number] | null>(null)
+  const [timeoutDur, setTimeoutDur] = useState(0)
   const closeReveal = useRef<(() => void) | null>(null)
   const alive = useRef(true)
   const logRef = useRef<HTMLOListElement>(null)
@@ -45,6 +50,13 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings }: Prop
     return () => {
       alive.current = false
     }
+  }, [])
+
+  // Duración del audio de cuenta regresiva (su último segundo coincide con el final del turno)
+  useEffect(() => {
+    void durationOf('timerout').then((d) => {
+      setTimeoutDur(d)
+    })
   }, [])
 
   // Scroll al fondo del log expandido cuando llegan nuevas líneas
@@ -72,11 +84,24 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings }: Prop
         return t - 1
       })
     }, 1000)
+    // Cuenta regresiva: arranca justo cuando falta lo que dura el audio, así termina con el turno
+    const startedAt = performance.now()
+    const dur = timeoutDur
+    let handle: SfxHandle | null = null
+    const beep =
+      dur > 0 && dur < TURN_SECONDS
+        ? setTimeout(() => {
+            handle = play('timerout', { variant: 0 })
+          }, (TURN_SECONDS - dur) * 1000)
+        : null
     return () => {
       if (timerRef.current) clearInterval(timerRef.current)
+      if (beep) clearTimeout(beep)
+      // Si el turno termina antes, se corta; si venció el tiempo, se deja sonar hasta el final
+      if (handle && performance.now() - startedAt < TURN_SECONDS * 1000 - 300) handle.stop()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [game.phase, game.current, busy])
+  }, [game.phase, game.current, busy, timeoutDur])
 
   // Cuando el timer llega a 0, auto-tirar dados aleatorios
   useEffect(() => {
@@ -92,8 +117,8 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings }: Prop
   const tile = BOARD[me.position]
   const locked = busy || game.phase === 'over'
 
-  const dispatch = async (action: Action) => {
-    if (busy) return
+  const dispatch = async (action: Action, force = false) => {
+    if (busy && !force) return
     const r = applyAction(game, action)
     if (!r.ok) {
       setError(r.error)
@@ -107,6 +132,7 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings }: Prop
     for (const e of r.events) {
       if (!alive.current) return
       if (e.type === 'moved') {
+        if (e.steps > 0) play('Slice')
         for (let k = 1; k <= e.steps; k++) {
           setShown((p) => ({ ...p, [e.player]: (e.from + k) % 40 }))
           await sleep(130)
@@ -115,8 +141,20 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings }: Prop
         await sleep(250)
         setShown((p) => ({ ...p, [e.player]: 10 }))
       } else if (e.type === 'card-drawn') {
+        play('cardtaken')
+        // "neg" suena cuando la carta termina de darse vuelta (la animación de vuelo dura ~1,1 s)
+        const negTimer = isNegativeCard(e.deck, e.cardId) ? setTimeout(() => play('neg'), 900) : null
         await showCard(e.deck, e.text)
+        if (negTimer) clearTimeout(negTimer)
         setGame(r.state)
+        if (cardPaysPlayer(e.deck, e.cardId)) play('moneycollected')
+      }
+      if (e.type === 'moved' && e.passedGo) play('moneycollected')
+      const sfx = sfxForEvent(e, action.player)
+      if (sfx) {
+        play(sfx)
+        // Si la partida termina por una quiebra, deja oír "Lose" antes de la victoria
+        if (e.type === 'bankrupt' && r.events.some((x) => x.type === 'won')) await sleep(1100)
       }
       // El registro va al ritmo de la animación (así la carta no se "spoilea")
       const line = describeEvent(e, nameOf)
@@ -147,9 +185,21 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings }: Prop
     void dispatch({ type: 'proposeTrade', player: offer.from, to: offer.to, give: offer.give, get: offer.get })
   }
 
-  const rollDice = () => {
+  /** Muestra números al azar en los dados hasta que termina el sonido y recién ahí aplica la tirada. */
+  const rollDice = async () => {
+    if (busy) return
     const [a, b] = manual ? [clampDie(dice[0]), clampDie(dice[1])] : [d6(), d6()]
-    void dispatch({ type: 'roll', player: me.id, dice: [a, b] })
+    setBusy(true)
+    const spin = setInterval(() => setRollFaces([d6(), d6()]), 85)
+    setRollFaces([d6(), d6()])
+    const started = performance.now()
+    await play('Dados').ended
+    const rest = 700 - (performance.now() - started) // mínimo de animación si no hay audio
+    if (rest > 0) await sleep(rest)
+    clearInterval(spin)
+    if (!alive.current) return
+    setRollFaces(null)
+    await dispatch({ type: 'roll', player: me.id, dice: [a, b] }, true)
   }
 
   const timerUrgent = timeLeft <= 10 && game.phase === 'roll' && !busy
@@ -164,6 +214,7 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings }: Prop
         colors={colors}
         drawable={game.phase === 'card' && !busy ? game.pendingCard?.deck ?? null : null}
         onDraw={() => void dispatch({ type: 'drawCard', player: me.id })}
+        rollFaces={rollFaces}
         reveal={reveal}
         onCloseReveal={() => closeReveal.current?.()}
       />
@@ -290,7 +341,7 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings }: Prop
 
               {game.phase === 'card' && game.pendingCard && (
                 <div className="stack">
-                  <p className="card-label">{game.pendingCard.deck === 'chance' ? '❓ Suerte' : '📦 Arca comunal'}</p>
+                  <p className="card-label">{game.pendingCard.deck === 'chance' ? '❓ Suerte' : '📦 Arcas del discord'}</p>
                   <p className="muted">Hacé clic en el mazo del tablero (o en el botón) para sacar una carta.</p>
                   <button className="btn primary" disabled={locked} onClick={() => void dispatch({ type: 'drawCard', player: me.id })}>
                     Sacar carta
