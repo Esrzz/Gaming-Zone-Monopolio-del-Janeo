@@ -39,7 +39,7 @@ const STREET_GAMES = ranking.slice(0, STREET_SLOTS.length)
 const platform = (name: string, icon: string): Tile => ({ kind: 'platform', name, price: 200, icon })
 const utility = (name: string, icon: string): Tile => ({ kind: 'utility', name, price: 150, icon })
 
-const FIXED: Record<number, Tile> = {
+const FIXED: Record<number, Tile> =  {
   0: { kind: 'go', name: 'Salida' },
   2: { kind: 'chest', name: 'Arcas del discord' },
   4: { kind: 'tax', name: 'Impuesto a las ganancias', amount: 200 },
@@ -50,7 +50,7 @@ const FIXED: Record<number, Tile> = {
   12: utility('Mute', '/icons/mic-off.svg'),
   15: platform('Spotify', '/icons/spotify.svg'),
   17: { kind: 'chest', name: 'Arcas del discord' },
-  20: { kind: 'parking', name: 'Estacionamiento libre' },
+  20: { kind: 'parking', name: 'Estacionamiento libre'},
   22: { kind: 'chance', name: 'Suerte' },
   25: platform('Twitch', '/icons/twitch.svg'),
   28: utility('Deafen', '/icons/headphones-off.svg'),

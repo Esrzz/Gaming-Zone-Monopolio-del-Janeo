@@ -7,7 +7,7 @@ import type { Card } from './types'
 export const CHANCE_CARDS: Card[] = [
   {
     id: 'ch-01',
-    text: '¡Te convertiste en el miembro más activo del server! Cobrá $200.',
+    text: '¡Te convertiste en el miembro más activo del server, Avanza a la salida! Cobrá $200.',
     effect: { kind: 'move', to: 0 },
   },
   {

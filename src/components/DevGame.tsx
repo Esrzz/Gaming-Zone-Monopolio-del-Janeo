@@ -17,7 +17,7 @@ const clampDie = (n: number) => Math.min(6, Math.max(1, Math.round(n) || 1))
 
 const TURN_SECONDS = 60
 /** Tiempo máximo que se muestra la carta antes de seguir (se puede cerrar antes con un clic) */
-const CARD_SECONDS = 4.5
+const CARD_SECONDS = 8
 
 interface Props {
   seats: Seat[]
