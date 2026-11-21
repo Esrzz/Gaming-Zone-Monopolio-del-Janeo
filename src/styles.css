@@ -114,10 +114,10 @@ body {
   min-height: calc(100svh - 60px);
 }
 .board-wrap {
-  /* Ocupa toda la altura disponible bajo el header, cuadrado */
-  height: calc(100svh - 60px);
-  width: calc(100svh - 60px);
-  max-width: calc(100vw - 280px);
+  /* Ocupa todo el ancho disponible restando el sidebar, altura = ancho (cuadrado) */
+  width: calc(100vw - 280px);
+  height: calc(100vw - 280px);
+  max-height: calc(100svh - 60px);
   position: relative;
 }
 .gboard { position: absolute; inset: 0; display: grid; border: 1px solid var(--line); border-radius: 0; overflow: hidden; background: rgba(14, 7, 34, 0.7); backdrop-filter: blur(10px); }
