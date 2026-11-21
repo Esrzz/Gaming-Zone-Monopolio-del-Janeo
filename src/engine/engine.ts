@@ -1,6 +1,7 @@
 import { BOARD, BOARD_SIZE, JAIL_POSITION, groupPositions, isBuyable, positionsOfKind, priceOf } from './board'
 import { CHANCE_CARDS, CHEST_CARDS, getCard } from './cards'
 import type { Action, GameEvent, GameState, Phase, PlayerId, PlayerState, Result, Rules } from './types'
+import { applyTradeAction, cancelTradeOf, isTradeAction } from './trade'
 
 export const DEFAULT_RULES: Rules = {
   startingCash: 1500,
@@ -45,6 +46,7 @@ export function createGame(players: { id: PlayerId; name: string }[], rules: Par
     pendingCard: null,
     chanceIndex: 0,
     chestIndex: 0,
+    trade: null,
   }
 }
 
@@ -90,6 +92,12 @@ export function applyAction(prev: GameState, action: Action): Result {
   if (action.type === 'bankrupt') {
     goBankrupt(s, ev, me, null)
     return { ok: true, state: s, events: ev }
+  }
+
+  // Los intercambios se pueden proponer y responder en cualquier momento, aunque no sea tu turno.
+  if (isTradeAction(action)) {
+    const error = applyTradeAction(s, ev, action)
+    return error ? fail(error) : { ok: true, state: s, events: ev }
   }
 
   if (currentPlayer(s).id !== action.player) return fail('No es tu turno')
@@ -413,6 +421,7 @@ function goBankrupt(s: GameState, ev: GameEvent[], p: PlayerState, creditor: Pla
   if (creditor) creditor.jailCards += p.jailCards
   p.jailCards = 0
   ev.push({ type: 'bankrupt', player: p.id, creditor: creditor?.id ?? null })
+  cancelTradeOf(s, ev, p.id)
 
   const alive = s.players.filter((x) => !x.bankrupt)
   if (alive.length === 1) {

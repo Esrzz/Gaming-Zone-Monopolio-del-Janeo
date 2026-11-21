@@ -86,6 +86,8 @@ export interface GameState {
   /** Índices del tope de cada mazo (se avanzan al robar) */
   chanceIndex: number
   chestIndex: number
+  /** Oferta de intercambio abierta (null si no hay) */
+  trade: TradeOffer | null
 }
 
 export type CardEffect =
@@ -106,6 +108,22 @@ export interface Card {
   effect: CardEffect
 }
 
+/** Lo que una de las partes pone en un intercambio. */
+export interface TradeSide {
+  cash: number
+  /** Posiciones de las propiedades */
+  properties: number[]
+  jailCards: number
+}
+
+/** Oferta abierta: `from` da `give` y recibe `get` de `to`. Hay una sola oferta abierta a la vez. */
+export interface TradeOffer {
+  from: PlayerId
+  to: PlayerId
+  give: TradeSide
+  get: TradeSide
+}
+
 export type Action =
   | { type: 'roll'; player: PlayerId; dice: [number, number] }
   | { type: 'buy'; player: PlayerId }
@@ -115,6 +133,10 @@ export type Action =
   | { type: 'useJailCard'; player: PlayerId }
   | { type: 'bankrupt'; player: PlayerId }
   | { type: 'drawCard'; player: PlayerId }
+  | { type: 'proposeTrade'; player: PlayerId; to: PlayerId; give: TradeSide; get: TradeSide }
+  | { type: 'acceptTrade'; player: PlayerId }
+  | { type: 'rejectTrade'; player: PlayerId }
+  | { type: 'cancelTrade'; player: PlayerId }
 
 /** Eventos que la interfaz usa para animar (movimiento de fichas, avisos, chat de sistema). */
 export type GameEvent =
@@ -129,6 +151,10 @@ export type GameEvent =
   | { type: 'left-jail'; player: PlayerId; how: 'doubles' | 'fine' | 'card' | 'forced' }
   | { type: 'card-pending'; player: PlayerId; deck: 'chance' | 'chest' }
   | { type: 'card-drawn'; player: PlayerId; deck: 'chance' | 'chest'; cardId: string; text: string }
+  | { type: 'trade-proposed'; trade: TradeOffer }
+  | { type: 'trade-accepted'; trade: TradeOffer }
+  | { type: 'trade-rejected'; trade: TradeOffer }
+  | { type: 'trade-cancelled'; trade: TradeOffer }
   | { type: 'bankrupt'; player: PlayerId; creditor: PlayerId | null }
   | { type: 'turn'; player: PlayerId }
   | { type: 'won'; player: PlayerId }

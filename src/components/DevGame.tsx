@@ -1,18 +1,20 @@
 import { useEffect, useRef, useState } from 'react'
 import { BOARD, applyAction, createGame, currentPlayer, isBuyable, priceOf } from '../engine'
-import { getCard } from '../engine/cards'
-import type { Action, GameState } from '../engine'
-import { describeEvent } from '../lib/describe'
+import type { Action, GameState, TradeOffer } from '../engine'
+import { describeEvent, describeSide } from '../lib/describe'
 import { PLAYER_COLORS } from '../lib/layout'
 import Avatar from './Avatar'
 import Board from './Board'
 import type { Seat } from './Board'
+import TradeModal from './TradeModal'
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 const d6 = () => Math.floor(Math.random() * 6) + 1
 const clampDie = (n: number) => Math.min(6, Math.max(1, Math.round(n) || 1))
 
 const TURN_SECONDS = 60
+/** Tiempo máximo que se muestra la carta antes de seguir (se puede cerrar antes con un clic) */
+const CARD_SECONDS = 4.5
 
 interface Props {
   seats: Seat[]
@@ -31,6 +33,9 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings }: Prop
   const [manual, setManual] = useState(false)
   const [dice, setDice] = useState<[number, number]>([1, 1])
   const [timeLeft, setTimeLeft] = useState(TURN_SECONDS)
+  const [reveal, setReveal] = useState<{ deck: 'chance' | 'chest'; text: string } | null>(null)
+  const [tradeOpen, setTradeOpen] = useState(false)
+  const closeReveal = useRef<(() => void) | null>(null)
   const alive = useRef(true)
   const logRef = useRef<HTMLOListElement>(null)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -95,9 +100,10 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings }: Prop
       return
     }
     setError(null)
-    setGame(r.state)
-    setLog((l) => [...l, ...r.events.flatMap((e) => describeEvent(e, nameOf) ?? [])])
     setBusy(true)
+    // Si sale una carta, el resultado (plata, fase, etc.) se muestra recién cuando se cierra la carta.
+    const hasCard = r.events.some((e) => e.type === 'card-drawn')
+    if (!hasCard) setGame(r.state)
     for (const e of r.events) {
       if (!alive.current) return
       if (e.type === 'moved') {
@@ -108,12 +114,37 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings }: Prop
       } else if (e.type === 'jailed') {
         await sleep(250)
         setShown((p) => ({ ...p, [e.player]: 10 }))
+      } else if (e.type === 'card-drawn') {
+        await showCard(e.deck, e.text)
+        setGame(r.state)
       }
+      // El registro va al ritmo de la animación (así la carta no se "spoilea")
+      const line = describeEvent(e, nameOf)
+      if (line) setLog((l) => [...l, line])
     }
     if (alive.current) {
       setShown(Object.fromEntries(r.state.players.map((p) => [p.id, p.position])))
       setBusy(false)
     }
+  }
+
+  /** Muestra la carta robada y espera a que pase el tiempo o se cierre con un clic. */
+  const showCard = (deck: 'chance' | 'chest', text: string) =>
+    new Promise<void>((resolve) => {
+      setReveal({ deck, text })
+      const done = () => {
+        clearTimeout(timer)
+        closeReveal.current = null
+        setReveal(null)
+        resolve()
+      }
+      const timer = setTimeout(done, CARD_SECONDS * 1000)
+      closeReveal.current = done
+    })
+
+  const propose = (offer: TradeOffer) => {
+    setTradeOpen(false)
+    void dispatch({ type: 'proposeTrade', player: offer.from, to: offer.to, give: offer.give, get: offer.get })
   }
 
   const rollDice = () => {
@@ -126,7 +157,16 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings }: Prop
 
   return (
     <div className="game">
-      <Board game={game} seats={seats} shown={shown} colors={colors} />
+      <Board
+        game={game}
+        seats={seats}
+        shown={shown}
+        colors={colors}
+        drawable={game.phase === 'card' && !busy ? game.pendingCard?.deck ?? null : null}
+        onDraw={() => void dispatch({ type: 'drawCard', player: me.id })}
+        reveal={reveal}
+        onCloseReveal={() => closeReveal.current?.()}
+      />
 
       <aside className="side">
         <section className="panel-card">
@@ -155,6 +195,29 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings }: Prop
             })}
           </ul>
         </section>
+
+        {game.trade && game.phase !== 'over' && (
+          <section className="offer-banner">
+            <h3>
+              Oferta: {nameOf(game.trade.from)} → {nameOf(game.trade.to)}
+            </h3>
+            <p>
+              {nameOf(game.trade.from)} da <strong>{describeSide(game.trade.give)}</strong> y pide{' '}
+              <strong>{describeSide(game.trade.get)}</strong>.
+            </p>
+            <div className="row3">
+              <button className="btn primary sm" disabled={busy} onClick={() => void dispatch({ type: 'acceptTrade', player: game.trade!.to })}>
+                {nameOf(game.trade.to)} acepta
+              </button>
+              <button className="btn ghost sm" disabled={busy} onClick={() => void dispatch({ type: 'rejectTrade', player: game.trade!.to })}>
+                Rechaza
+              </button>
+              <button className="link" disabled={busy} onClick={() => void dispatch({ type: 'cancelTrade', player: game.trade!.from })}>
+                Retirar
+              </button>
+            </div>
+          </section>
+        )}
 
         <section className="panel-card">
           {game.phase === 'over' ? (
@@ -225,18 +288,15 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings }: Prop
                 </div>
               )}
 
-              {game.phase === 'card' && game.pendingCard && (() => {
-                const card = getCard(game.pendingCard.deck, game.pendingCard.deck === 'chance' ? game.chanceIndex - 1 : game.chestIndex - 1)
-                return (
-                  <div className="stack">
-                    <p className="card-label">{game.pendingCard.deck === 'chance' ? '🎲 Suerte' : '📦 Arca Comunal'}</p>
-                    <p className="card-text">"{card.text}"</p>
-                    <button className="btn primary" disabled={locked} onClick={() => void dispatch({ type: 'drawCard', player: me.id })}>
-                      Aplicar carta
-                    </button>
-                  </div>
-                )
-              })()}
+              {game.phase === 'card' && game.pendingCard && (
+                <div className="stack">
+                  <p className="card-label">{game.pendingCard.deck === 'chance' ? '❓ Suerte' : '📦 Arca comunal'}</p>
+                  <p className="muted">Hacé clic en el mazo del tablero (o en el botón) para sacar una carta.</p>
+                  <button className="btn primary" disabled={locked} onClick={() => void dispatch({ type: 'drawCard', player: me.id })}>
+                    Sacar carta
+                  </button>
+                </div>
+              )}
 
               {game.phase === 'end' && (
                 <button className="btn primary" disabled={locked} onClick={() => void dispatch({ type: 'endTurn', player: me.id })}>
@@ -245,6 +305,10 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings }: Prop
               )}
 
               {error && <p className="err">{error}</p>}
+
+              <button className="btn ghost sm" disabled={locked || !!game.trade} onClick={() => setTradeOpen(true)}>
+                🤝 Intercambiar
+              </button>
 
               <button
                 className="link danger"
@@ -275,6 +339,17 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings }: Prop
           Salir de la partida de prueba
         </button>
       </aside>
+
+      {tradeOpen && (
+        <TradeModal
+          game={game}
+          seats={seats}
+          colors={colors}
+          defaultFrom={me.id}
+          onPropose={propose}
+          onClose={() => setTradeOpen(false)}
+        />
+      )}
     </div>
   )
 }

@@ -2,6 +2,7 @@ import { BOARD } from '../engine'
 import type { GameState, Tile } from '../engine'
 import { GRID_TEMPLATE, GROUP_COLORS, gridCell, sideOf, tileCenter } from '../lib/layout'
 import Avatar from './Avatar'
+import CardReveal from './CardReveal'
 
 export interface Seat {
   id: string
@@ -15,6 +16,12 @@ interface Props {
   /** Posición que se está mostrando de cada ficha (puede ir detrás del estado mientras se anima) */
   shown: Record<string, number>
   colors: Record<string, string>
+  /** Mazo que el jugador de turno tiene que robar ahora (se resalta y se puede clickear) */
+  drawable?: 'chance' | 'chest' | null
+  onDraw?: () => void
+  /** Carta que se está mostrando (animación de robo) */
+  reveal?: { deck: 'chance' | 'chest'; text: string } | null
+  onCloseReveal?: () => void
 }
 
 function stripColor(t: Tile): string | null {
@@ -37,7 +44,7 @@ function label(t: Tile): string {
   }
 }
 
-export default function Board({ game, seats, shown, colors }: Props) {
+export default function Board({ game, seats, shown, colors, drawable = null, onDraw, reveal = null, onCloseReveal }: Props) {
   const tokens = seats.filter((s) => !game.players.find((p) => p.id === s.id)?.bankrupt)
   const slot: Record<number, number> = {}
 
@@ -79,8 +86,33 @@ export default function Board({ game, seats, shown, colors }: Props) {
             ))}
           </div>
           {game.rules.freeParkingJackpot && <p className="muted">Pozo: ${game.pot}</p>}
+
+          <button
+            type="button"
+            className={`deck deck-chest${drawable === 'chest' ? ' ready' : ''}`}
+            disabled={drawable !== 'chest'}
+            onClick={onDraw}
+            aria-label="Mazo de Arca comunal"
+          >
+            <span className="deck-icon">📦</span>
+            <span className="deck-name">Arca comunal</span>
+            {drawable === 'chest' && <span className="deck-hint">¡Sacá una carta!</span>}
+          </button>
+          <button
+            type="button"
+            className={`deck deck-chance${drawable === 'chance' ? ' ready' : ''}`}
+            disabled={drawable !== 'chance'}
+            onClick={onDraw}
+            aria-label="Mazo de Suerte"
+          >
+            <span className="deck-icon">❓</span>
+            <span className="deck-name">Suerte</span>
+            {drawable === 'chance' && <span className="deck-hint">¡Sacá una carta!</span>}
+          </button>
         </div>
       </div>
+
+      {reveal && <CardReveal deck={reveal.deck} text={reveal.text} onClose={onCloseReveal} />}
 
       {tokens.map((s) => {
         const pos = shown[s.id] ?? 0

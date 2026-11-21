@@ -38,3 +38,19 @@ npm run build
 ## Despliegue
 
 Cloudflare Pages (front) y Workers/Durable Objects (salas).
+
+## Intercambios
+
+Cualquier jugador puede proponer un intercambio en cualquier momento (aunque no sea su turno) con otro jugador vivo.
+Hay una sola oferta abierta a la vez. Cada lado puede dar plata, propiedades y cartas de salida.
+
+- Solo acepta o rechaza quien recibe la oferta; solo cancela quien la hizo. Al aceptar se vuelve a validar todo.
+- No se intercambian propiedades de un grupo de color que tenga casas u hoteles (hay que venderlos antes).
+- Quien recibe una propiedad hipotecada paga el 10% del valor de la hipoteca al banco (sigue hipotecada).
+- Si un jugador quiebra, se cancela su oferta abierta.
+- Código: `src/engine/trade.ts` (reglas) y `src/components/TradeModal.tsx` (interfaz).
+
+## Cartas
+
+Al caer en Suerte o Arca comunal hay que hacer clic en el mazo del tablero: la carta sale, se da vuelta y muestra
+su texto (se cierra con un clic o a los 4,5 s) y recién ahí se aplica el efecto.
