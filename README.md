@@ -99,4 +99,24 @@ si quiebra). Cuando `draw` se vacía, se rebaraja el descarte.
 - `src/engine/lobby.ts`: salas, host, listos, reglas, inicio, `dispatch` con validaciones, desconexión con gracia de
   2 min (`expiredMembers` → `abandon`), `publicRoom`.
 - `src/engine/protocol.ts`: mensajes cliente/servidor, `parseClientMessage`, `sanitizeChat`, `PROTOCOL_VERSION`.
-- Falta: Durable Object + WebSocket que los use, cliente online, reconexión y chat en la UI.
+- Falta: cliente online (pantallas, conectar el tablero al servidor, reconexión y chat en la UI).
+
+## Servidor (Cloudflare Worker + Durable Objects)
+
+Carpeta `server/`. Un Durable Object por sala (`GameRoom`, el nombre es el código) usa `lobby.ts`, `protocol.ts` y
+`clock.ts`; guarda la sala en su almacenamiento (sobrevive a reinicios) y usa alarmas para: tiempo agotado
+(`timeoutAction`, encadenado hasta pasar el turno), desconectados (2 min en partida, 30 s en lobby → `abandon`) y
+borrar salas terminadas/abandonadas.
+
+- `POST /api/rooms` → `{ code }` (código libre). El host se conecta con `wss://…/ws/CODIGO?token=T&create=1`; el resto
+  sin `create`. Después el primer mensaje es `{ t: 'join', code, name, avatar? }` (ver `protocol.ts`).
+- `token`: secreto de 16+ caracteres que genera el cliente y guarda en `localStorage`. El id público del jugador es un
+  hash del token, así nadie se hace pasar por otro. Con el mismo token se reconecta.
+- El servidor tira los dados (rechaza `dice` del cliente), valida que cada acción sea del jugador, limita mensajes
+  (25 cada 2 s, chat 1 cada 0,4 s) y filtra avatares a `cdn.discordapp.com`, `media.discordapp.net` y el Worker de stats.
+- Cada `room`/`update` trae `clock: { turnMsLeft, tradeMsLeft }` (milisegundos que quedan).
+- Config en `server/wrangler.toml`: `TURN_SECONDS` (240), `TRADE_SECONDS` (60), `ALLOWED_ORIGINS` (orígenes de la web).
+
+Comandos: `npm run server:dev` (local, puerto 8787), `npm run server:smoke` (2 clientes juegan por WebSocket),
+`npm run server:typecheck`, `npm run server:deploy`. Prueba del reloj: `wrangler dev … --var TURN_SECONDS:3` y
+`node server/scripts/smoke-timeout.mjs`.

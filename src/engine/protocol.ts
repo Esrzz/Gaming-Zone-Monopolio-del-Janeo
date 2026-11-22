@@ -1,3 +1,4 @@
+import type { ClockView } from './clock'
 import type { Room } from './lobby'
 import type { Action, GameEvent } from './types'
 
@@ -21,9 +22,9 @@ export type ClientMessage =
 
 export type ServerMessage =
   /** Estado completo de la sala (al entrar, reconectar o cambiar el lobby) */
-  | { t: 'room'; room: Room; you: string; version: number }
+  | { t: 'room'; room: Room; you: string; version: number; clock: ClockView | null }
   /** Resultado de una acción: los eventos para animar y el nuevo `seq`; con `room` cuando conviene resincronizar */
-  | { t: 'update'; events: GameEvent[]; seq: number; room: Room }
+  | { t: 'update'; events: GameEvent[]; seq: number; room: Room; clock: ClockView | null }
   | { t: 'error'; error: string }
   | { t: 'chat'; from: string; text: string; at: number }
   | { t: 'pong' }
