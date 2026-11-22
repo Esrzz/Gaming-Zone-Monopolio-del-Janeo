@@ -441,9 +441,9 @@ body {
 /* ── Arte de fondo del tablero: dos imágenes que se funden como una sola textura ── */
 .board-art { position: absolute; inset: 0; z-index: 0; overflow: hidden; pointer-events: none; border-radius: inherit;
   background: radial-gradient(ellipse 60% 55% at 50% 50%, rgba(124, 58, 237, 0.22), transparent 72%); }
-.board-art .art { position: absolute; width: 68%; aspect-ratio: 1; background-size: cover; background-position: center;
+.board-art .art { position: absolute; width: 50%; aspect-ratio: 1; background-size: cover; background-position: center;
   mix-blend-mode: screen; opacity: 0.4; filter: saturate(1.1) contrast(1.05);
   -webkit-mask-image: radial-gradient(circle at 50% 50%, #000 30%, rgba(0, 0, 0, 0.6) 52%, transparent 74%);
   mask-image: radial-gradient(circle at 50% 50%, #000 30%, rgba(0, 0, 0, 0.6) 52%, transparent 74%); }
-.board-art .art-tr { top: -10%; right: -9%; background-image: url('./assets/board-art-tr.webp'); transform: rotate(6deg); }
-.board-art .art-bl { bottom: -10%; left: -9%; background-image: url('./assets/board-art-bl.webp'); transform: rotate(-6deg); }
+.board-art .art-tr { top: -7%; right: -7%; background-image: url('./assets/board-art-tr.webp'); transform: rotate(6deg); }
+.board-art .art-bl { bottom: -7%; left: -7%; background-image: url('./assets/board-art-bl.webp'); transform: rotate(-6deg); }
