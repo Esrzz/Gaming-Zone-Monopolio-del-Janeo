@@ -3,15 +3,17 @@ import avatars from './data/avatars.json'
 import AuroraBackground from './components/AuroraBackground'
 import Avatar from './components/Avatar'
 import DevGame from './components/DevGame'
+import OnlineRoom from './components/OnlineRoom'
 import Header from './components/Header'
 import SettingsModal from './components/SettingsModal'
 import type { Seat } from './components/Board'
 import { isDevId } from './lib/dev'
+import { lastRoom, requestRoomCode } from './lib/net'
 import { findAvatar, NAME_MAX, validName } from './lib/profile'
 import { play as playSfx } from './lib/sfx'
 import { useAudio } from './lib/useAudio'
 
-type Screen = 'name' | 'menu' | 'play' | 'join' | 'host' | 'devgame'
+type Screen = 'name' | 'menu' | 'play' | 'join' | 'host' | 'devgame' | 'online'
 
 interface Profile {
   id: string | null
@@ -34,6 +36,10 @@ export default function App() {
   const [devPlayers, setDevPlayers] = useState(3)
   const [seats, setSeats] = useState<Seat[]>([])
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [room, setRoom] = useState<{ code: string; create: boolean } | null>(null)
+  const [onlineWide, setOnlineWide] = useState(false)
+  const [hostError, setHostError] = useState<string | null>(null)
+  const [hostBusy, setHostBusy] = useState(false)
 
   const { prefs, tracks, setMusicVolume, setSfxVolume, setTrack, startMusic } = useAudio()
 
@@ -65,6 +71,31 @@ export default function App() {
   const toggleDev = (on: boolean) => {
     setDevMode(on)
     if (!on && screen === 'devgame') setScreen('menu')
+  }
+
+  const hostRoom = async () => {
+    setHostError(null)
+    setHostBusy(true)
+    try {
+      const c = await requestRoomCode()
+      setRoom({ code: c, create: true })
+      setScreen('online')
+    } catch (e) {
+      setHostError(e instanceof Error ? e.message : 'No se pudo crear la sala')
+    } finally {
+      setHostBusy(false)
+    }
+  }
+
+  const joinRoom = (c: string, create = false) => {
+    setRoom({ code: c, create })
+    setScreen('online')
+  }
+
+  const leaveOnline = () => {
+    setRoom(null)
+    setOnlineWide(false)
+    setScreen('menu')
   }
 
   const startDevGame = () => {
@@ -100,8 +131,8 @@ export default function App() {
         />
       )}
 
-      <main className={`stage ${screen === 'devgame' ? 'wide' : ''}`}>
-        {screen !== 'devgame' && (
+      <main className={`stage ${screen === 'devgame' || (screen === 'online' && onlineWide) ? 'wide' : ''}`}>
+        {screen !== 'devgame' && !(screen === 'online' && onlineWide) && (
           <header className="brandline">
             <span className="brand-top">Gaming Zone</span>
             <h1>Monopolio del janeo</h1>
@@ -133,13 +164,18 @@ export default function App() {
           </form>
         )}
 
-        {profile && screen !== 'name' && screen !== 'devgame' && (
+        {profile && screen !== 'name' && screen !== 'devgame' && screen !== 'online' && (
           <div className="card">
             {screen === 'menu' && (
               <div className="stack">
                 <button className="btn primary" onClick={() => setScreen('play')}>
                   Jugar
                 </button>
+                {lastRoom.get() && (
+                  <button className="btn ghost" onClick={() => joinRoom(lastRoom.get()!)}>
+                    Volver a la sala {lastRoom.get()}
+                  </button>
+                )}
                 <button className="btn ghost" onClick={() => setSettingsOpen(true)}>
                   Configuraciones
                 </button>
@@ -194,10 +230,9 @@ export default function App() {
                   onChange={(e) => setCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))}
                   aria-label="Código de sala"
                 />
-                <button className="btn primary" disabled={code.length < 4}>
+                <button className="btn primary" disabled={code.length < 4} onClick={() => joinRoom(code)}>
                   Unirse
                 </button>
-                <p className="muted">Las salas online todavía no están conectadas.</p>
                 <button className="link" onClick={() => setScreen('play')}>
                   Volver
                 </button>
@@ -206,13 +241,29 @@ export default function App() {
 
             {screen === 'host' && (
               <div className="stack">
-                <p className="muted">Acá se va a generar el código de la sala. Falta el servidor.</p>
+                <p className="muted">Se crea una sala nueva y te da un código para compartir con tus amigos.</p>
+                {hostError && <p className="err">{hostError}</p>}
+                <button className="btn primary" disabled={hostBusy} onClick={() => void hostRoom()}>
+                  {hostBusy ? 'Creando…' : 'Crear sala'}
+                </button>
                 <button className="link" onClick={() => setScreen('play')}>
                   Volver
                 </button>
               </div>
             )}
           </div>
+        )}
+
+        {screen === 'online' && profile && room && (
+          <OnlineRoom
+            code={room.code}
+            create={room.create}
+            name={profile.name}
+            avatar={profile.avatar}
+            onExit={leaveOnline}
+            onSettings={() => setSettingsOpen(true)}
+            onLayout={setOnlineWide}
+          />
         )}
 
         {screen === 'devgame' && (

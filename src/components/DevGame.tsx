@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { BOARD, applyAction, createGame, currentPlayer, isBuyable, isManageAction, priceOf, timeoutAction } from '../engine'
-import type { Action, GameState, TradeOffer } from '../engine'
+import type { Action, GameEvent, GameState, TradeOffer } from '../engine'
 import { describeEvent, describeSide } from '../lib/describe'
 import { PLAYER_COLORS } from '../lib/layout'
 import Avatar from './Avatar'
@@ -13,6 +13,7 @@ import { cardPaysPlayer, isNegativeCard, sfxForEvent } from '../lib/sfxEvents'
 import { knownDuration, play } from '../lib/sfx'
 import { moneyChanges } from '../lib/moneyFx'
 import type { SfxHandle } from '../lib/sfx'
+import type { OnlineLink } from '../lib/onlineLink'
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 const d6 = () => Math.floor(Math.random() * 6) + 1
@@ -44,6 +45,8 @@ interface Props {
   seats: Seat[]
   onExit: () => void
   onSettings: () => void
+  /** Partida online: el servidor decide y esta pantalla solo envía acciones y anima lo que llega */
+  online?: OnlineLink
 }
 
 interface Floating {
@@ -53,11 +56,13 @@ interface Floating {
 }
 
 /** Partida local de prueba: el developer tira los dados de todos los turnos. */
-export default function DevGame({ seats, onExit, onSettings: _onSettings }: Props) {
-  const [game, setGame] = useState<GameState>(() => createGame(seats.map((s) => ({ id: s.id, name: s.name }))))
-  const [shown, setShown] = useState<Record<string, number>>(() => Object.fromEntries(seats.map((s) => [s.id, 0])))
+export default function DevGame({ seats, onExit, onSettings: _onSettings, online }: Props) {
+  const [game, setGame] = useState<GameState>(() => online?.initial ?? createGame(seats.map((s) => ({ id: s.id, name: s.name }))))
+  const [shown, setShown] = useState<Record<string, number>>(() =>
+    Object.fromEntries(seats.map((s) => [s.id, online?.initial.players.find((p) => p.id === s.id)?.position ?? 0])),
+  )
   const [busy, setBusy] = useState(false)
-  const [log, setLog] = useState<string[]>(['Partida de prueba iniciada'])
+  const [log, setLog] = useState<string[]>([online ? 'Partida iniciada' : 'Partida de prueba iniciada'])
   const [logExpanded, setLogExpanded] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [manual, setManual] = useState(false)
@@ -76,6 +81,10 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings }: Prop
   const diceSound = useRef<SfxHandle | null>(null)
   const moveSound = useRef<SfxHandle | null>(null)
   const [rollFaces, setRollFaces] = useState<[number, number] | null>(null)
+  const spin = useRef<{ iv: ReturnType<typeof setInterval>; ended: Promise<void> } | null>(null)
+  /** Cuántos resultados se están animando (online pueden llegar varios seguidos) */
+  const playing = useRef(0)
+  const queue = useRef<Promise<void>>(Promise.resolve())
   const closeReveal = useRef<(() => void) | null>(null)
   const payDone = useRef<(() => void) | null>(null)
   const alive = useRef(true)
@@ -106,6 +115,7 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings }: Prop
   // Cada turno nuevo arranca con el tiempo completo
   useEffect(() => {
     setManageOpen(false)
+    if (online) return // online manda el reloj del servidor
     turnMs.current = TURN_SECONDS * 1000
     setTimeLeft(TURN_SECONDS)
   }, [game.current])
@@ -113,6 +123,7 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings }: Prop
   // Una oferta nueva arranca el reloj de quien la recibe (el del turno queda en pausa)
   const tradeKey = game.trade ? `${game.trade.from}>${game.trade.to}` : ''
   useEffect(() => {
+    if (online) return
     tradeMs.current = TRADE_SECONDS * 1000
     setTradeLeft(TRADE_SECONDS)
   }, [tradeKey])
@@ -123,7 +134,9 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings }: Prop
   const tile = BOARD[me.position]
   const owing = game.debts.some((d) => d.from === me.id)
   const debt = game.debts.find((d) => d.from === me.id)
-  const locked = busy || game.phase === 'over'
+  /** En online solo actuás en tu turno; en la partida de prueba el developer maneja a todos */
+  const mine = !online || me.id === online.you
+  const locked = busy || game.phase === 'over' || !mine
 
   const addFloat = (player: string, amount: number) => {
     const id = ++floatSeq.current
@@ -144,6 +157,17 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings }: Prop
   const dispatch = async (action: Action, force = false) => {
     if (busy && !force) return
     if (!force) fast.current = false
+    if (online) {
+      // El servidor decide: se manda la acción y el resultado llega por `subscribe` (playResult)
+      setError(null)
+      if (!isManageAction(action)) setProp(null)
+      if (!online.send(action)) {
+        setError('Sin conexión con el servidor, esperá a que se reconecte')
+        return
+      }
+      setBusy(true)
+      return
+    }
     const r = applyAction(game, action)
     if (!r.ok) {
       setError(r.error)
@@ -152,16 +176,29 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings }: Prop
     setError(null)
     setBusy(true)
     if (!isManageAction(action)) setProp(null)
+    await playResult(r.state, r.events, action.player)
+  }
+
+  /** Anima un resultado (local o del servidor): fichas, cartas, alquileres, sonidos, plata y registro. */
+  const playResult = async (state: GameState, events: GameEvent[], actor: string) => {
+    playing.current += 1
+    setBusy(true)
+    if (online && events.some((e) => e.type === 'rolled')) {
+      // la tirada de otro jugador (o la propia, ya girando): los dados giran hasta que termina el sonido
+      if (!spin.current) startSpin()
+      await spin.current!.ended
+      stopSpin()
+    }
     // Si sale una carta o hay que pagar un alquiler, el resultado (plata, fase, etc.) se muestra recién después.
     let applied = false
     const apply = () => {
       if (!applied) {
         applied = true
-        setGame(r.state)
+        setGame(state)
       }
     }
-    if (!r.events.some((e) => e.type === 'card-drawn' || e.type === 'rent')) apply()
-    for (const e of r.events) {
+    if (!events.some((e) => e.type === 'card-drawn' || e.type === 'rent')) apply()
+    for (const e of events) {
       if (!alive.current) return
       if (e.type === 'moved') {
         if (e.steps > 0) {
@@ -194,30 +231,32 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings }: Prop
         apply()
         if (cardPaysPlayer(e.deck, e.cardId)) play('moneycollected')
       } else if (e.type === 'rent') {
-        await showRent(e.tile, e.amount, nameOf(e.to))
+        await showRent(e.tile, e.amount, nameOf(e.to), actor)
         apply()
       }
-      for (const c of moneyChanges(e, r.state.rules)) addFloat(c.player, c.amount)
-      const sfx = sfxForEvent(e, action.player)
+      for (const c of moneyChanges(e, state.rules)) addFloat(c.player, c.amount)
+      const sfx = sfxForEvent(e, actor)
       if (sfx) {
         play(sfx)
         // Si la partida termina por una quiebra, deja oír "Lose" antes de la victoria
-        if (e.type === 'bankrupt' && r.events.some((x) => x.type === 'won')) await sleep(1100)
+        if (e.type === 'bankrupt' && events.some((x) => x.type === 'won')) await sleep(1100)
       }
       // El registro va al ritmo de la animación (así la carta no se "spoilea")
       const line = describeEvent(e, nameOf)
       if (line) setLog((l) => [...l, line])
     }
     apply()
+    playing.current -= 1
     if (alive.current) {
-      setShown(Object.fromEntries(r.state.players.map((p) => [p.id, p.position])))
-      setBusy(false)
-      if (r.state.debts.length > 0) setManageOpen(true) // hay que juntar plata
-      // Cayó en una propiedad libre: la tarjeta sale de la casilla con la opción de comprar
-      if (r.state.phase === 'buy') {
-        const cur = r.state.players[r.state.current]
+      setShown(Object.fromEntries(state.players.map((p) => [p.id, p.position])))
+      setBusy(playing.current > 0)
+      // hay que juntar plata (online: solo si la deuda es tuya)
+      if (state.debts.some((d) => !online || d.from === online.you)) setManageOpen(true)
+      // Cayó en una propiedad libre: la tarjeta sale de la casilla con la opción de comprar (online: solo a quien le toca)
+      const cur = state.players[state.current]
+      if (state.phase === 'buy' && (!online || cur.id === online.you)) {
         const pos = cur.position
-        const o = r.state.owned[pos]
+        const o = state.owned[pos]
         openProp({ pos, mode: 'buy', ownerName: o ? nameOf(o.owner) : null, cash: cur.cash })
       }
     }
@@ -238,16 +277,19 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings }: Prop
     })
 
   /** Tarjeta de la propiedad donde se cayó, con el botón de pagar el alquiler (se paga sola si pasa el tiempo). */
-  const showRent = (pos: number, amount: number, ownerName: string) =>
+  const showRent = (pos: number, amount: number, ownerName: string, actor: string) =>
     new Promise<void>((resolve) => {
-      openProp({ pos, mode: 'pay', amount, ownerName, houses: game.owned[pos]?.houses, cash: me.cash })
+      // online: solo quien paga confirma; los demás ven la tarjeta un instante
+      const watching = !!online && actor !== online.you
+      if (watching) openProp(propInfo(pos, 'info', { cash: undefined }))
+      else openProp({ pos, mode: 'pay', amount, ownerName, houses: game.owned[pos]?.houses, cash: me.cash })
       const done = () => {
         clearTimeout(timer)
         payDone.current = null
         setProp(null)
         resolve()
       }
-      const timer = setTimeout(done, PAY_SECONDS * 1000)
+      const timer = setTimeout(done, (watching ? 2500 : PAY_SECONDS * 1000))
       payDone.current = done
     })
 
@@ -256,25 +298,48 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings }: Prop
     void dispatch({ type: 'proposeTrade', player: offer.from, to: offer.to, give: offer.give, get: offer.get })
   }
 
-  /** Muestra números al azar en los dados hasta que termina el sonido y recién ahí aplica la tirada. */
-  const rollDice = async () => {
-    if (busy) return
-    const [a, b] = manual ? [clampDie(dice[0]), clampDie(dice[1])] : [d6(), d6()]
-    setBusy(true)
-    setProp(null)
-    fast.current = false
-    const spin = setInterval(() => setRollFaces([d6(), d6()]), 85)
+  /** Muestra números al azar en los dados hasta que termina el sonido (o hasta un clic para acelerar). */
+  const startSpin = () => {
+    const iv = setInterval(() => setRollFaces([d6(), d6()]), 85)
     setRollFaces([d6(), d6()])
     const started = performance.now()
     const h = (diceSound.current = play('Dados'))
-    await h.ended // termina con el sonido, o antes si se hace clic en los dados
-    diceSound.current = null
-    const rest = 700 - (performance.now() - started) // mínimo de animación si no hay audio
-    if (rest > 0 && !fast.current) await sleep(rest)
-    clearInterval(spin)
-    if (!alive.current) return
+    const ended = (async () => {
+      await h.ended // termina con el sonido, o antes si se hace clic en los dados
+      diceSound.current = null
+      const rest = 700 - (performance.now() - started) // mínimo de animación si no hay audio
+      if (rest > 0 && !fast.current) await sleep(rest)
+    })()
+    spin.current = { iv, ended }
+  }
+  const stopSpin = () => {
+    if (spin.current) clearInterval(spin.current.iv)
+    spin.current = null
     setRollFaces(null)
     fast.current = false // acelerar los dados no acelera también la ficha
+  }
+
+  const rollDice = async () => {
+    if (busy) return
+    setBusy(true)
+    setProp(null)
+    fast.current = false
+    if (online) {
+      // los dados giran mientras el servidor tira; el resultado llega por `subscribe`
+      startSpin()
+      if (!online.send({ type: 'roll', player: me.id })) {
+        diceSound.current?.stop(100)
+        stopSpin()
+        setBusy(false)
+        setError('Sin conexión con el servidor, esperá a que se reconecte')
+      }
+      return
+    }
+    const [a, b] = manual ? [clampDie(dice[0]), clampDie(dice[1])] : [d6(), d6()]
+    startSpin()
+    await spin.current!.ended
+    stopSpin()
+    if (!alive.current) return
     await dispatch({ type: 'roll', player: me.id, dice: [a, b] }, true)
   }
 
@@ -284,9 +349,9 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings }: Prop
       fast.current = true
       diceSound.current?.stop(150)
       moveSound.current?.stop(100)
-    } else if (!busy && !owing && game.phase === 'roll') void rollDice()
+    } else if (!busy && mine && !owing && game.phase === 'roll') void rollDice()
   }
-  const diceAction: 'roll' | 'skip' | null = rollFaces || moving ? 'skip' : !busy && !owing && game.phase === 'roll' ? 'roll' : null
+  const diceAction: 'roll' | 'skip' | null = rollFaces || moving ? 'skip' : !busy && mine && !owing && game.phase === 'roll' ? 'roll' : null
 
   /** Consultar una propiedad haciendo clic clic en su casilla (en cualquier momento, también fuera de turno). */
   const inspect = (pos: number) => {
@@ -303,8 +368,37 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings }: Prop
   }
 
   // Siempre las últimas versiones para el reloj (que corre fuera del ciclo de render)
-  const live = useRef({ game, busy, dispatch, rollDice, autoStep: autoStep })
-  live.current = { game, busy, dispatch, rollDice, autoStep }
+  const live = useRef({ game, busy, dispatch, rollDice, autoStep, playResult })
+  live.current = { game, busy, dispatch, rollDice, autoStep, playResult }
+
+  // Online: lo que manda el servidor se anima de a uno, en orden
+  useEffect(() => {
+    if (!online) return
+    const enqueue = (fn: () => Promise<void>) => {
+      queue.current = queue.current.then(fn).catch((err) => console.error(err))
+    }
+    return online.subscribe((u) => {
+      if (u.kind === 'clock') {
+        if (u.clock?.turnMsLeft != null) turnMs.current = u.clock.turnMsLeft
+        if (u.clock?.tradeMsLeft != null) tradeMs.current = u.clock.tradeMsLeft
+      } else if (u.kind === 'error') {
+        setError(u.error)
+        if (spin.current) {
+          diceSound.current?.stop(100)
+          stopSpin()
+        }
+        if (playing.current === 0) setBusy(false)
+      } else if (u.kind === 'update') {
+        enqueue(() => live.current.playResult(u.state, u.events, currentPlayer(live.current.game).id))
+      } else {
+        enqueue(async () => {
+          setGame(u.state)
+          setShown(Object.fromEntries(u.state.players.map((p) => [p.id, p.position])))
+        })
+      }
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // Reloj: corre durante todo el turno; en pausa mientras hay animaciones. Con una oferta abierta, corre el de quien la recibe.
   useEffect(() => {
@@ -318,7 +412,7 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings }: Prop
       const dt = now - last
       last = now
       const { game: g, busy: b } = live.current
-      if (g.phase === 'over' || b) return stopBeep()
+      if (g.phase === 'over' || (b && !online)) return stopBeep()
       const trade = !!g.trade
       const ref = trade ? tradeMs : turnMs
       ref.current = Math.max(0, ref.current - dt)
@@ -337,7 +431,7 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings }: Prop
         stopBeep() // el reloj se reinició (acción del jugador, oferta resuelta…)
       }
 
-      if (ref.current <= 0 && !firing.current) {
+      if (ref.current <= 0 && !firing.current && !online) {
         firing.current = true
         void live.current.autoStep().finally(() => {
           firing.current = false
@@ -364,7 +458,7 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings }: Prop
         diceAction={diceAction}
         onDiceClick={diceClick}
         colors={colors}
-        drawable={game.phase === 'card' && !busy ? game.pendingCard?.deck ?? null : null}
+        drawable={game.phase === 'card' && !busy && mine ? game.pendingCard?.deck ?? null : null}
         onDraw={() => void dispatch({ type: 'drawCard', player: me.id })}
         rollFaces={rollFaces}
         reveal={reveal}
@@ -382,6 +476,7 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings }: Prop
       />
 
       <aside className="side">
+        {online?.status === 'reconnecting' && <div className="net-banner">Reconectando con el servidor…</div>}
         <section className="panel-card">
           <h3>Jugadores</h3>
           <ul className="plist">
@@ -396,6 +491,7 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings }: Prop
                     {p.name}
                     {p.inJail && <em> · cárcel</em>}
                     {p.bankrupt && <em> · quebró</em>}
+                    {online?.offline.includes(p.id) && !p.bankrupt && <em> · sin conexión</em>}
                   </span>
                   <span className="pcash">${p.cash}</span>
                   {floats
@@ -427,13 +523,13 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings }: Prop
               <strong>{describeSide(game.trade.get)}</strong>.
             </p>
             <div className="row3">
-              <button className="btn primary sm" disabled={busy} onClick={() => void dispatch({ type: 'acceptTrade', player: game.trade!.to })}>
-                {nameOf(game.trade.to)} acepta
+              <button className="btn primary sm" disabled={busy || (!!online && game.trade.to !== online.you)} onClick={() => void dispatch({ type: 'acceptTrade', player: game.trade!.to })}>
+                {online ? 'Aceptar' : `${nameOf(game.trade.to)} acepta`}
               </button>
-              <button className="btn ghost sm" disabled={busy} onClick={() => void dispatch({ type: 'rejectTrade', player: game.trade!.to })}>
+              <button className="btn ghost sm" disabled={busy || (!!online && game.trade.to !== online.you)} onClick={() => void dispatch({ type: 'rejectTrade', player: game.trade!.to })}>
                 Rechaza
               </button>
-              <button className="link" disabled={busy} onClick={() => void dispatch({ type: 'cancelTrade', player: game.trade!.from })}>
+              <button className="link" disabled={busy || (!!online && game.trade.from !== online.you)} onClick={() => void dispatch({ type: 'cancelTrade', player: game.trade!.from })}>
                 Retirar
               </button>
             </div>
@@ -462,7 +558,7 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings }: Prop
                 {game.phase === 'roll' && game.rollAgain ? ' · sacó dobles, tira de nuevo' : ''}
               </p>
 
-              {owing && debt && (
+              {mine && owing && debt && (
                 <div className="debt-box">
                   <strong>Tenés una deuda de ${debt.amount}</strong>
                   <span>
@@ -474,10 +570,10 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings }: Prop
                 </div>
               )}
 
-              {!owing && game.phase === 'roll' && (
+              {mine && !owing && game.phase === 'roll' && (
                 <div className="stack">
                   <button className="btn primary" disabled={locked} onClick={rollDice}>
-                    Tirar dados por {me.name}
+                    Tirar dados{online ? '' : ` por ${me.name}`}
                   </button>
                   {me.inJail && (
                     <div className="row2">
@@ -489,10 +585,10 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings }: Prop
                       </button>
                     </div>
                   )}
-                  <label className="check">
+                  {!online && <label className="check">
                     <input type="checkbox" checked={manual} onChange={(e) => setManual(e.target.checked)} /> Dados manuales
-                  </label>
-                  {manual && (
+                  </label>}
+                  {!online && manual && (
                     <div className="row2">
                       {[0, 1].map((i) => (
                         <input
@@ -511,7 +607,7 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings }: Prop
                 </div>
               )}
 
-              {!owing && game.phase === 'buy' && isBuyable(tile) && (
+              {mine && !owing && game.phase === 'buy' && isBuyable(tile) && (
                 <div className="stack">
                   <button className="btn primary" disabled={locked || me.cash < priceOf(tile)} onClick={() => void dispatch({ type: 'buy', player: me.id })}>
                     Comprar {tile.name} (${priceOf(tile)})
@@ -522,7 +618,7 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings }: Prop
                 </div>
               )}
 
-              {!owing && game.phase === 'card' && game.pendingCard && (
+              {mine && !owing && game.phase === 'card' && game.pendingCard && (
                 <div className="stack">
                   <p className="card-label">{game.pendingCard.deck === 'chance' ? '❓ Suerte' : '📦 Arcas del discord'}</p>
                   <p className="muted">Hacé clic en el mazo del tablero (o en el botón) para sacar una carta.</p>
@@ -532,11 +628,13 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings }: Prop
                 </div>
               )}
 
-              {!owing && game.phase === 'end' && (
+              {mine && !owing && game.phase === 'end' && (
                 <button className="btn primary" disabled={locked} onClick={() => void dispatch({ type: 'endTurn', player: me.id })}>
                   Terminar turno
                 </button>
               )}
+
+              {!mine && <p className="muted">Esperando a {me.name}…</p>}
 
               {error && <p className="err">{error}</p>}
 
@@ -560,6 +658,8 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings }: Prop
           )}
         </section>
 
+        {online?.sidebar}
+
         <section className="panel-card log-panel">
           <div className="log-header">
             <h3>Registro</h3>
@@ -575,7 +675,7 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings }: Prop
         </section>
 
         <button className="link" onClick={onExit}>
-          Salir de la partida de prueba
+          {online ? 'Salir de la partida' : 'Salir de la partida de prueba'}
         </button>
       </aside>
 

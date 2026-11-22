@@ -370,3 +370,34 @@ body {
 .debt-box { display: grid; gap: 8px; padding: 10px 12px; border-radius: 12px; border: 1px solid rgba(255, 107, 107, 0.55); background: rgba(255, 107, 107, 0.12); font-size: 0.86rem; }
 .debt-box strong { color: #ff8a8a; font: 700 1rem var(--display); }
 .mg-debt { margin: 0 0 10px; padding: 8px 12px; border-radius: 10px; border: 1px solid rgba(255, 107, 107, 0.55); background: rgba(255, 107, 107, 0.12); font-size: 0.88rem; }
+
+/* ── Online: lobby, chat y estado de conexión ── */
+.net-banner { padding: 8px 12px; border-radius: 12px; border: 1px solid rgba(255, 190, 80, 0.6); background: rgba(255, 190, 80, 0.14); font-size: 0.85rem; text-align: center; }
+.lobby-wrap { display: grid; gap: 14px; width: min(560px, 100%); margin: 0 auto; }
+.lobby { display: grid; gap: 16px; }
+.lobby-code { display: grid; gap: 4px; justify-items: center; }
+.code-big { cursor: pointer; border: 1px dashed var(--line); border-radius: 14px; background: rgba(124, 58, 237, 0.12); color: inherit; padding: 6px 22px; font: 700 2rem var(--display); letter-spacing: 0.35em; }
+.code-big:hover { background: rgba(124, 58, 237, 0.24); }
+.mlist { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.mlist li { display: flex; align-items: center; gap: 10px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 12px; background: rgba(255, 255, 255, 0.03); }
+.mlist li.off { opacity: 0.55; }
+.mlist .mname { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mlist em { font-style: normal; opacity: 0.7; font-size: 0.8rem; }
+.mstate { font-size: 0.8rem; opacity: 0.7; }
+.mstate.ok { color: #35e08a; opacity: 1; }
+.rules summary { cursor: pointer; font-weight: 600; }
+.rules-grid { display: grid; gap: 8px; margin-top: 10px; }
+.rule { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 0.9rem; }
+.rule .input { width: 110px; }
+.chat { gap: 6px; }
+.chat-lines { margin: 0; padding: 0; list-style: none; max-height: 150px; overflow-y: auto; display: grid; gap: 3px; font-size: 0.85rem; overflow-wrap: anywhere; }
+.chat-lines b { color: var(--orchid, #c4b5fd); }
+.chat-form { display: flex; gap: 6px; }
+.chat-form .input { flex: 1; min-width: 0; }
+.side > * { min-width: 0; }
+.chat, .chat-form { min-width: 0; }
+.chat-form .input { width: 100%; }
+.panel-card { grid-template-columns: minmax(0, 1fr); }
+.panel-card > * { min-width: 0; }
+.side .btn { overflow-wrap: anywhere; }
+.side .row-btns .btn { white-space: normal; padding-inline: 0.5rem; }

@@ -99,7 +99,7 @@ si quiebra). Cuando `draw` se vacía, se rebaraja el descarte.
 - `src/engine/lobby.ts`: salas, host, listos, reglas, inicio, `dispatch` con validaciones, desconexión con gracia de
   2 min (`expiredMembers` → `abandon`), `publicRoom`.
 - `src/engine/protocol.ts`: mensajes cliente/servidor, `parseClientMessage`, `sanitizeChat`, `PROTOCOL_VERSION`.
-- Falta: cliente online (pantallas, conectar el tablero al servidor, reconexión y chat en la UI).
+- Cliente online hecho: ver la sección "Cliente online".
 
 ## Servidor (Cloudflare Worker + Durable Objects)
 
@@ -120,3 +120,13 @@ borrar salas terminadas/abandonadas.
 Comandos: `npm run server:dev` (local, puerto 8787), `npm run server:smoke` (2 clientes juegan por WebSocket),
 `npm run server:typecheck`, `npm run server:deploy`. Prueba del reloj: `wrangler dev … --var TURN_SECONDS:3` y
 `node server/scripts/smoke-timeout.mjs`.
+
+## Cliente online
+
+- `src/lib/net.ts`: `RoomClient` (WebSocket con reconexión automática, ping, token en `localStorage`), `requestRoomCode`,
+  `SERVER_URL` (por defecto el Worker deployado; para probar contra `wrangler dev`: `VITE_SERVER_URL=http://localhost:8787 npm run dev`).
+- `src/components/OnlineRoom.tsx`: lobby (código, listos, reglas del host, chat) y, al empezar, la partida.
+- La pantalla de juego (`DevGame.tsx`) sirve para las dos cosas: con la prop `online` (`src/lib/onlineLink.ts`) no usa el motor
+  local, solo manda acciones y anima en orden lo que llega del servidor (dados, fichas, cartas, alquileres, plata, sonidos);
+  los relojes salen del servidor (`clock`). Solo podés actuar en tu turno; el intercambio lo responde quien lo recibe.
+- Recargar la página: en el menú aparece "Volver a la sala XXXXX" (mismo token = misma identidad, 2 min de gracia).
