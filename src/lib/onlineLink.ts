@@ -1,11 +1,13 @@
 import type { ReactNode } from 'react'
-import type { Action, ClockView, GameEvent, GameState } from '../engine'
+import type { Action, ClockView, GameEvent, GameState, UiKind } from '../engine'
 import type { NetStatus } from './net'
 
 /** Lo que el servidor le avisa a la pantalla de juego */
 export type NetUpdate =
   /** Resultado de una acción (de cualquiera): estado nuevo + eventos para animar */
-  | { kind: 'update'; state: GameState; events: GameEvent[] }
+  | { kind: 'update'; state: GameState; events: GameEvent[]; seq: number; auto: boolean }
+  /** Alguien aceleró la animación o cerró la carta: se replica en todas las pantallas */
+  | { kind: 'ui'; ui: UiKind; seq: number }
   /** Estado completo (al entrar o reconectar), sin animación */
   | { kind: 'sync'; state: GameState }
   /** Relojes del servidor (ms restantes) */
@@ -17,6 +19,8 @@ export interface OnlineLink {
   you: string
   initial: GameState
   send: (action: Action) => boolean
+  /** Avisa a los demás de un gesto de pantalla (acelerar, cerrar carta) del resultado número `seq` */
+  sendUi: (ui: UiKind, seq: number) => void
   subscribe: (listener: (u: NetUpdate) => void) => () => void
   /** ids de jugadores sin conexión */
   offline: string[]

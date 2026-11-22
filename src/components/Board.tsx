@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { BOARD } from '../engine'
 import type { GameState, Tile } from '../engine'
 import { GRID_TEMPLATE, GROUP_COLORS, TOKEN_SIZE, gridCell, sideOf, tokenSlot } from '../lib/layout'
@@ -37,6 +38,8 @@ interface Props {
   /** Clic en una casilla comprable (consultar su información) */
   onTileClick?: (pos: number) => void
   /** Tarjeta de propiedad abierta y sus acciones */
+  /** Panel que se dibuja en el centro del tablero (oferta de intercambio) */
+  overlay?: ReactNode
   property?: (PropertyView & { onBuy?: () => void; onDecline?: () => void; onPay?: () => void; onClose?: () => void }) | null
 }
 
@@ -60,7 +63,7 @@ function label(t: Tile): string {
   }
 }
 
-export default function Board({ game, seats, shown, colors, drawable = null, onDraw, rollFaces = null, onDiceClick, diceAction = null, stepMs = 130, reveal = null, onCloseReveal, onTileClick, property = null }: Props) {
+export default function Board({ game, seats, shown, colors, drawable = null, onDraw, rollFaces = null, onDiceClick, diceAction = null, stepMs = 130, reveal = null, onCloseReveal, onTileClick, property = null, overlay = null }: Props) {
   const tokens = seats.filter((s) => !game.players.find((p) => p.id === s.id)?.bankrupt)
   const perTile: Record<number, number> = {}
   for (const s of tokens) perTile[shown[s.id] ?? 0] = (perTile[shown[s.id] ?? 0] ?? 0) + 1
@@ -144,6 +147,7 @@ export default function Board({ game, seats, shown, colors, drawable = null, onD
         </div>
       </div>
 
+      {overlay}
       {reveal && <CardReveal deck={reveal.deck} text={reveal.text} onClose={onCloseReveal} />}
       {property && !reveal && (
         <PropertyCard

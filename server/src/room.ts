@@ -201,6 +201,10 @@ export class GameRoom extends DurableObject<Env> {
       }
       case 'action':
         return answer(dispatch(st.room, att.id, msg.action), true)
+      case 'ui':
+        // gestos de pantalla: se reenvían a los demás (el que lo hizo ya lo aplicó); solo en partida
+        if (st.room.status !== 'playing') return
+        return this.broadcast({ t: 'ui', kind: msg.kind, seq: msg.seq, from: att.id }, ws)
       case 'chat': {
         if (now - (this.lastChat.get(att.id) ?? 0) < CHAT_MIN_GAP_MS) return
         this.lastChat.set(att.id, now)
@@ -213,7 +217,7 @@ export class GameRoom extends DurableObject<Env> {
   // ── Estado, difusión y alarmas ──────────────────────────────────────────────
 
   /** Guarda la sala nueva, ajusta los relojes, programa la alarma y avisa a todos. */
-  private async commit(room: Room, events?: GameEvent[]): Promise<void> {
+  private async commit(room: Room, events?: GameEvent[], auto = false): Promise<void> {
     const st = this.st!
     const now = Date.now()
     st.room = room
@@ -223,10 +227,10 @@ export class GameRoom extends DurableObject<Env> {
     if (room.members.length === 0) return this.destroy()
     await this.ctx.storage.put('st', st)
     await this.schedule()
-    this.broadcastState(events)
+    this.broadcastState(events, auto)
   }
 
-  private broadcastState(events?: GameEvent[]): void {
+  private broadcastState(events?: GameEvent[], auto = false): void {
     const st = this.st
     if (!st) return
     const pub = publicRoom(st.room)
@@ -234,13 +238,13 @@ export class GameRoom extends DurableObject<Env> {
     for (const ws of this.ctx.getWebSockets()) {
       const a = ws.deserializeAttachment() as Attach | null
       if (!a?.joined) continue
-      this.send(ws, events ? { t: 'update', events, seq: st.room.game?.seq ?? 0, room: pub, clock } : { t: 'room', room: pub, you: a.id, version: st.version, clock })
+      this.send(ws, events ? { t: 'update', events, seq: st.room.game?.seq ?? 0, room: pub, clock, ...(auto ? { auto: true } : {}) } : { t: 'room', room: pub, you: a.id, version: st.version, clock })
     }
   }
 
-  private broadcast(msg: ServerMessage): void {
+  private broadcast(msg: ServerMessage, except?: WebSocket): void {
     for (const ws of this.ctx.getWebSockets()) {
-      if ((ws.deserializeAttachment() as Attach | null)?.joined) this.send(ws, msg)
+      if (ws !== except && (ws.deserializeAttachment() as Attach | null)?.joined) this.send(ws, msg)
     }
   }
 
@@ -306,6 +310,7 @@ export class GameRoom extends DurableObject<Env> {
     let room = st.room
     const events: GameEvent[] = []
     let changed = false
+    let auto = false
 
     // 1) Tiempo agotado: el motor decide la acción automática (y se encadena hasta pasar el turno)
     for (let i = 0; i < MAX_AUTO_STEPS && room.status === 'playing' && room.game && isDue(st.clock, now); i++) {
@@ -316,6 +321,7 @@ export class GameRoom extends DurableObject<Env> {
       room = r.room
       events.push(...r.events)
       changed = true
+      auto = true
       st.clock = advanceClock(st.clock, room.status === 'playing' ? room.game : null, now, this.cfg)
     }
     if (room.status === 'playing' && isDue(st.clock, now)) {
@@ -344,7 +350,7 @@ export class GameRoom extends DurableObject<Env> {
     }
 
     if (changed) {
-      await this.commit(room, events.length ? events : undefined)
+      await this.commit(room, events.length ? events : undefined, auto)
       if (!this.st) return
     }
 

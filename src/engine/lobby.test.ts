@@ -134,6 +134,14 @@ describe('sala: partida', () => {
 })
 
 describe('protocolo', () => {
+  it('acepta gestos de pantalla válidos y rechaza el resto', () => {
+    expect(parseClientMessage({ t: 'ui', kind: 'fast', seq: 4 })).toEqual({ t: 'ui', kind: 'fast', seq: 4 })
+    expect(parseClientMessage({ t: 'ui', kind: 'closeCard', seq: 0 })).toEqual({ t: 'ui', kind: 'closeCard', seq: 0 })
+    expect(parseClientMessage({ t: 'ui', kind: 'otra', seq: 1 })).toBeNull()
+    expect(parseClientMessage({ t: 'ui', kind: 'fast', seq: 1.5 })).toBeNull()
+    expect(parseClientMessage({ t: 'ui', kind: 'fast' })).toBeNull()
+  })
+
   it('acepta mensajes válidos y rechaza basura sin lanzar', () => {
     expect(parseClientMessage('{"t":"join","code":"abcde","name":"Ana"}')).toMatchObject({ t: 'join', code: 'ABCDE' })
     expect(parseClientMessage({ t: 'action', action: { type: 'roll', player: 'a' } })).toMatchObject({ t: 'action' })

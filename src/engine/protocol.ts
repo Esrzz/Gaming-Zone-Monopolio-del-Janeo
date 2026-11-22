@@ -9,6 +9,9 @@ import type { Action, GameEvent } from './types'
 
 export const PROTOCOL_VERSION = 1
 
+export type UiKind = 'fast' | 'closeCard'
+const UI_KINDS = new Set<string>(['fast', 'closeCard'])
+
 export type ClientMessage =
   | { t: 'join'; code: string; name: string; avatar?: string | null }
   | { t: 'ready'; ready: boolean }
@@ -18,13 +21,17 @@ export type ClientMessage =
   /** `seq`: la última versión del estado que vio el cliente (para detectar si le falta algo) */
   | { t: 'action'; action: Action; seq?: number }
   | { t: 'chat'; text: string }
+  /** Gesto de pantalla que ven todos: acelerar la animación o cerrar la carta. `seq` = resultado que se está animando */
+  | { t: 'ui'; kind: UiKind; seq: number }
   | { t: 'ping' }
 
 export type ServerMessage =
   /** Estado completo de la sala (al entrar, reconectar o cambiar el lobby) */
   | { t: 'room'; room: Room; you: string; version: number; clock: ClockView | null }
   /** Resultado de una acción: los eventos para animar y el nuevo `seq`; con `room` cuando conviene resincronizar */
-  | { t: 'update'; events: GameEvent[]; seq: number; room: Room; clock: ClockView | null }
+  /** `auto`: lo jugó el servidor por tiempo agotado (los clientes no animan cartas ni alquileres) */
+  | { t: 'update'; events: GameEvent[]; seq: number; room: Room; clock: ClockView | null; auto?: boolean }
+  | { t: 'ui'; kind: UiKind; seq: number; from: string }
   | { t: 'error'; error: string }
   | { t: 'chat'; from: string; text: string; at: number }
   | { t: 'pong' }
@@ -73,6 +80,9 @@ export function parseClientMessage(raw: unknown): ClientMessage | null {
       const text = sanitizeChat(m.text)
       return text ? { t: 'chat', text } : null
     }
+    case 'ui':
+      if (typeof m.kind !== 'string' || !UI_KINDS.has(m.kind) || !Number.isInteger(m.seq)) return null
+      return { t: 'ui', kind: m.kind as UiKind, seq: m.seq as number }
     case 'action': {
       const a = m.action
       if (!isObj(a) || typeof a.type !== 'string' || !ACTION_TYPES.has(a.type) || !isStr(a.player)) return null

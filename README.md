@@ -130,3 +130,8 @@ Comandos: `npm run server:dev` (local, puerto 8787), `npm run server:smoke` (2 c
   local, solo manda acciones y anima en orden lo que llega del servidor (dados, fichas, cartas, alquileres, plata, sonidos);
   los relojes salen del servidor (`clock`). Solo podés actuar en tu turno; el intercambio lo responde quien lo recibe.
 - Recargar la página: en el menú aparece "Volver a la sala XXXXX" (mismo token = misma identidad, 2 min de gracia).
+- Gestos compartidos: acelerar la animación (clic en los dados) o cerrar la carta se replican en todas las pantallas con
+  `{ t: 'ui', kind, seq }` (el servidor solo los reenvía; `seq` = resultado que se está animando, para que no caigan en otra animación).
+- Tirada automática (tiempo agotado): el `update` trae `auto: true`; los clientes no levantan carta ni muestran alquiler,
+  y el registro dice "sacó X y Y (tirada automática)".
+- Oferta de intercambio: panel en el centro del tablero para todos; solo quien la recibe acepta/rechaza y solo quien la hizo la retira.

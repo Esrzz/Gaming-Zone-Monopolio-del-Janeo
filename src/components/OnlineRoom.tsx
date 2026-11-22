@@ -61,7 +61,9 @@ export default function OnlineRoom({ code, create, name, avatar, onExit, onSetti
         } else if (m.t === 'update') {
           setRoom(m.room)
           emit({ kind: 'clock', clock: m.clock })
-          if (m.room.game) emit({ kind: 'update', state: m.room.game, events: m.events })
+          if (m.room.game) emit({ kind: 'update', state: m.room.game, events: m.events, seq: m.seq, auto: !!m.auto })
+        } else if (m.t === 'ui') {
+          emit({ kind: 'ui', ui: m.kind, seq: m.seq })
         } else if (m.t === 'chat') {
           setChat((l) => [...l.slice(-99), { from: m.from, text: m.text, at: m.at }])
         } else if (m.t === 'error') {
@@ -105,6 +107,7 @@ export default function OnlineRoom({ code, create, name, avatar, onExit, onSetti
           you,
           initial: room.game,
           send: (a: Action) => client.current?.send({ t: 'action', action: a }) ?? false,
+          sendUi: (ui, seq) => void client.current?.send({ t: 'ui', kind: ui, seq }),
           subscribe: (l) => {
             listeners.current.add(l)
             return () => listeners.current.delete(l)

@@ -96,6 +96,14 @@ const roll = up.events.find((e) => e.type === 'rolled')
 check(roll && roll.dice.length === 2 && roll.dice.every((d) => d >= 1 && d <= 6), `el servidor tiró los dados: ${roll?.dice}`)
 check(up.seq > 0, `seq=${up.seq}`)
 
+// gestos de pantalla: se reenvían a los demás (no al que los hizo)
+A.clear(); B.clear()
+Q.send({ t: 'ui', kind: 'fast', seq: up.seq })
+const ui = await P.until((m) => m.t === 'ui', 'ui reenviado')
+check(ui.kind === 'fast' && ui.seq === up.seq && ui.from !== pid, 'el gesto de acelerar le llega a los demás')
+await wait(150)
+check(!Q.msgs.some((m) => m.t === 'ui'), 'y no se le devuelve a quien lo hizo')
+
 // acciones con forma inválida
 P.send({ t: 'action', action: { type: 'abandon', player: pid } })
 check((await P.until((m) => m.t === 'error' && m !== undefined, 'abandon')).t === 'error', 'abandon no se acepta desde el cliente')
