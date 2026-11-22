@@ -7,7 +7,14 @@ const json = (body: unknown, init: ResponseInit = {}, cors: Record<string, strin
   new Response(JSON.stringify(body), { ...init, headers: { 'content-type': 'application/json', ...cors } })
 
 function originAllowed(req: Request, env: Env): boolean {
-  const list = (env.ALLOWED_ORIGINS ?? '').split(',').map((s) => s.trim()).filter(Boolean)
+  // se compara por origen (sin barra final ni ruta): 'https://sitio.com/' y 'https://sitio.com' valen igual
+  const list = (env.ALLOWED_ORIGINS ?? '').split(',').map((s) => s.trim()).filter(Boolean).map((s) => {
+    try {
+      return new URL(s).origin
+    } catch {
+      return s
+    }
+  })
   const origin = req.headers.get('Origin')
   if (list.length === 0 || !origin) return true // sin lista (desarrollo) o cliente que no es un navegador
   return list.includes(origin)

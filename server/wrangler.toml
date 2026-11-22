@@ -7,7 +7,7 @@ compatibility_date = "2025-09-01"
 TURN_SECONDS = "240"
 TRADE_SECONDS = "60"
 # Orígenes de la web que pueden usar el servidor, separados por coma. Vacío = cualquiera (solo para desarrollo).
-ALLOWED_ORIGINS = "https://monopolio-del-janeo.gamingzone.workers.dev/"
+ALLOWED_ORIGINS = "https://monopolio-del-janeo.gamingzone.workers.dev,http://localhost:5173"
 
 [[durable_objects.bindings]]
 name = "ROOMS"
