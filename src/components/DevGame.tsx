@@ -15,13 +15,13 @@ import { moneyChanges } from '../lib/moneyFx'
 import type { SfxHandle } from '../lib/sfx'
 import type { OnlineLink } from '../lib/onlineLink'
 import { tileDot } from '../lib/tileColor'
-import TradeOverlay from './TradeOverlay'
+import TradeOverlay, { TradeResult } from './TradeOverlay'
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 const d6 = () => Math.floor(Math.random() * 6) + 1
 const clampDie = (n: number) => Math.min(6, Math.max(1, Math.round(n) || 1))
 
-/** Tiempo total de cada turno (corre durante todo el turno, no solo al tirar). Configurable con VITE_TURN_SECONDS. */
+/** Tiempo de cada turno en la partida de prueba local (online lo fija el host en el lobby). Configurable con VITE_TURN_SECONDS. */
 const TURN_SECONDS = Number(import.meta.env.VITE_TURN_SECONDS) || 240
 /** Tiempo que tiene quien recibe una oferta de intercambio para responderla (si no, se rechaza). */
 const TRADE_SECONDS = Number(import.meta.env.VITE_TRADE_SECONDS) || 60
@@ -59,7 +59,7 @@ interface Floating {
 
 /** Partida local de prueba: el developer tira los dados de todos los turnos. */
 export default function DevGame({ seats, onExit, onSettings: _onSettings, online }: Props) {
-  const [game, setGame] = useState<GameState>(() => online?.initial ?? createGame(seats.map((s) => ({ id: s.id, name: s.name }))))
+  const [game, setGame] = useState<GameState>(() => online?.initial ?? createGame(seats.map((s) => ({ id: s.id, name: s.name })), { turnSeconds: TURN_SECONDS }))
   const [shown, setShown] = useState<Record<string, number>>(() =>
     Object.fromEntries(seats.map((s) => [s.id, online?.initial.players.find((p) => p.id === s.id)?.position ?? 0])),
   )
@@ -69,13 +69,16 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings, online
   const [error, setError] = useState<string | null>(null)
   const [manual, setManual] = useState(false)
   const [dice, setDice] = useState<[number, number]>([1, 1])
-  const [timeLeft, setTimeLeft] = useState(TURN_SECONDS)
+  const [timeLeft, setTimeLeft] = useState(game.rules.turnSeconds)
   const [tradeLeft, setTradeLeft] = useState(TRADE_SECONDS)
   const [reveal, setReveal] = useState<{ deck: 'chance' | 'chest'; text: string } | null>(null)
   const [prop, setProp] = useState<PropertyView | null>(null)
   const [floats, setFloats] = useState<Floating[]>([])
   const [tradeOpen, setTradeOpen] = useState(false)
   const [manageOpen, setManageOpen] = useState(false)
+  /** Resultado de una oferta (aceptada / rechazada / retirada), unos segundos en el centro del tablero */
+  const [tradeFx, setTradeFx] = useState<{ kind: 'accepted' | 'rejected' | 'cancelled'; from: string; to: string } | null>(null)
+  const tradeFxTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [moving, setMoving] = useState(false)
   const [stepMs, setStepMs] = useState(STEP_MS)
   /** Clic en los dados mientras anima: acelera el resto de la animación */
@@ -96,7 +99,7 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings, online
   const logRef = useRef<HTMLOListElement>(null)
   const floatSeq = useRef(0)
   // Temporizadores: restante en ms del turno y de la respuesta a una oferta
-  const turnMs = useRef(TURN_SECONDS * 1000)
+  const turnMs = useRef(game.rules.turnSeconds * 1000)
   const tradeMs = useRef(TRADE_SECONDS * 1000)
   const firing = useRef(false)
   const beep = useRef<{ key: string; h: SfxHandle } | null>(null)
@@ -121,8 +124,8 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings, online
   useEffect(() => {
     setManageOpen(false)
     if (online) return // online manda el reloj del servidor
-    turnMs.current = TURN_SECONDS * 1000
-    setTimeLeft(TURN_SECONDS)
+    turnMs.current = game.rules.turnSeconds * 1000
+    setTimeLeft(game.rules.turnSeconds)
   }, [game.current])
 
   // Una oferta nueva arranca el reloj de quien la recibe (el del turno queda en pausa)
@@ -227,6 +230,12 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings, online
           h?.stop(120) // si el sonido era más largo que el recorrido, se corta suave al llegar
           moveSound.current = null
         }
+      } else if (e.type === 'trade-accepted' || e.type === 'trade-rejected' || e.type === 'trade-cancelled') {
+        const kind = e.type === 'trade-accepted' ? 'accepted' : e.type === 'trade-rejected' ? 'rejected' : 'cancelled'
+        if (tradeFxTimer.current) clearTimeout(tradeFxTimer.current)
+        setTradeFx({ kind, from: nameOf(e.trade.from), to: nameOf(e.trade.to) })
+        tradeFxTimer.current = setTimeout(() => setTradeFx(null), 2000)
+        play(kind === 'accepted' ? 'Cardbought' : 'neg')
       } else if (e.type === 'jailed') {
         await sleep(250)
         setShown((p) => ({ ...p, [e.player]: 10 }))
@@ -494,7 +503,9 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings, online
         }}
         onTileClick={inspect}
         overlay={
-          game.trade && game.phase !== 'over' ? (
+          tradeFx ? (
+            <TradeResult kind={tradeFx.kind} from={tradeFx.from} to={tradeFx.to} />
+          ) : game.trade && game.phase !== 'over' ? (
             <TradeOverlay
               trade={game.trade}
               nameOf={nameOf}

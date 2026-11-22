@@ -16,6 +16,7 @@ import {
   parseClientMessage,
   publicRoom,
   reconnect,
+  sanitizeRules,
   disconnect,
   setReady,
   setRules,
@@ -83,7 +84,8 @@ export class GameRoom extends DurableObject<Env> {
 
   private get cfg(): ClockConfig {
     const secs = (v: string | undefined, d: number) => (v && Number(v) > 0 ? Number(v) : d)
-    return { turnMs: secs(this.env.TURN_SECONDS, 240) * 1000, tradeMs: secs(this.env.TRADE_SECONDS, 60) * 1000 }
+    // el turno lo fija el host en las reglas de la sala; TURN_SECONDS (wrangler.toml) es solo el valor inicial
+    return { turnMs: (this.st?.room.rules.turnSeconds ?? secs(this.env.TURN_SECONDS, 240)) * 1000, tradeMs: secs(this.env.TRADE_SECONDS, 60) * 1000 }
   }
 
   // ── Conexión ────────────────────────────────────────────────────────────────
@@ -149,6 +151,8 @@ export class GameRoom extends DurableObject<Env> {
     if (!this.st) {
       if (!att.create) return this.send(ws, { t: 'error', error: 'Esa sala no existe' })
       room = createRoom(att.code, who)
+      const turn = Number(this.env.TURN_SECONDS)
+      if (turn > 0) room = { ...room, rules: sanitizeRules({ ...room.rules, turnSeconds: turn }) }
       this.st = { room, clock: emptyClock(), version: 0, finishedAt: null }
     } else {
       const r = joinRoom(this.st.room, who)

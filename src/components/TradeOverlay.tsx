@@ -36,6 +36,23 @@ function Side({ side }: { side: TradeSide }) {
   )
 }
 
+/** Resultado de la oferta: verde si la aceptaron, rojo si la rechazaron (o se venció), gris si se retiró. */
+export function TradeResult({ kind, from, to }: { kind: 'accepted' | 'rejected' | 'cancelled'; from: string; to: string }) {
+  const text = kind === 'accepted' ? 'Oferta aceptada' : kind === 'rejected' ? 'Oferta rechazada' : 'Oferta retirada'
+  const icon = kind === 'accepted' ? '✓' : kind === 'rejected' ? '✕' : '↩'
+  return (
+    <div className="tradefx" role="status" aria-live="polite">
+      <div className={`trade-result ${kind}`}>
+        <span className="tr-icon">{icon}</span>
+        <strong>{text}</strong>
+        <small>
+          {from} ⇄ {to}
+        </small>
+      </div>
+    </div>
+  )
+}
+
 /** Oferta de intercambio en el centro del tablero: la ven todos, la responde solo quien la recibe. */
 export default function TradeOverlay({ trade, nameOf, secondsLeft, role, busy, onAccept, onReject, onCancel }: Props) {
   return (

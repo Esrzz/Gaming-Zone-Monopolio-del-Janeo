@@ -45,6 +45,8 @@ export interface Rules {
   hotelsTotal: number
   /** Variante: los impuestos van a un pozo que se cobra al caer en Estacionamiento */
   freeParkingJackpot: boolean
+  /** Duración de cada turno en segundos (corre todo el turno); la fija el host al crear la partida */
+  turnSeconds: number
 }
 
 export interface PlayerState {

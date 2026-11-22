@@ -15,6 +15,7 @@ export const DEFAULT_RULES: Rules = {
   housesTotal: 32,
   hotelsTotal: 12,
   freeParkingJackpot: false,
+  turnSeconds: 240,
 }
 
 export const MIN_PLAYERS = 2
@@ -118,6 +119,7 @@ export function sanitizeRules(input: Partial<Rules> = {}): Rules {
       ? r.platformRent.map((n) => Math.round(n))
       : [...DEFAULT_RULES.platformRent]
   r.freeParkingJackpot = !!r.freeParkingJackpot
+  r.turnSeconds = int(r.turnSeconds, 15, 1800, DEFAULT_RULES.turnSeconds)
   return r
 }
 

@@ -95,7 +95,7 @@ export function setReady(room: Room, id: PlayerId, ready: boolean): RoomResult {
   const r = clone(room)
   const m = r.members.find((x) => x.id === id)
   if (!m) return fail('No estás en la sala')
-  m.ready = id === r.hostId ? true : ready
+  m.ready = ready
   return ok(r)
 }
 

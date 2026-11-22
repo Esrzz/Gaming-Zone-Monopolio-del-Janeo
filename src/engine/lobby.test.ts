@@ -34,6 +34,28 @@ function lobby(n = 3): Room {
 }
 
 describe('sala: lobby', () => {
+  it('el host también puede marcarse como no listo, y entonces no se puede empezar', () => {
+    let room = lobby(2)
+    expect(room.members[0].ready).toBe(true) // arranca listo
+    expect(whyCannotStart(room)).toBeNull()
+    room = must(setReady(room, 'h', false))
+    expect(room.members[0].ready).toBe(false)
+    expect(whyCannotStart(room)).toMatch(/Host/)
+    room = must(setReady(room, 'h', true))
+    expect(whyCannotStart(room)).toBeNull()
+  })
+
+  it('el host elige la duración del turno (acotada) y los demás tienen que volver a confirmar', () => {
+    let room = lobby(3)
+    expect(room.rules.turnSeconds).toBe(240)
+    room = must(setRules(room, 'h', { turnSeconds: 90 }))
+    expect(room.rules.turnSeconds).toBe(90)
+    expect(room.members.filter((m) => m.id !== 'h').every((m) => !m.ready)).toBe(true)
+    expect(must(setRules(room, 'h', { turnSeconds: 1 })).rules.turnSeconds).toBe(15)
+    expect(must(setRules(room, 'h', { turnSeconds: 99999 })).rules.turnSeconds).toBe(1800)
+    expect(setRules(room, 'p1', { turnSeconds: 30 }).ok).toBe(false)
+  })
+
   it('el host crea la sala y entran jugadores hasta 6', () => {
     let room = lobby(6)
     expect(room.members).toHaveLength(6)

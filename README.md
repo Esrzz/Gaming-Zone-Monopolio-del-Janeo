@@ -135,3 +135,5 @@ Comandos: `npm run server:dev` (local, puerto 8787), `npm run server:smoke` (2 c
 - Tirada automática (tiempo agotado): el `update` trae `auto: true`; los clientes no levantan carta ni muestran alquiler,
   y el registro dice "sacó X y Y (tirada automática)".
 - Oferta de intercambio: panel en el centro del tablero para todos; solo quien la recibe acepta/rechaza y solo quien la hizo la retira.
+- El host fija la duración del turno (`rules.turnSeconds`, 15–1800 s) en el lobby; `TURN_SECONDS` de `server/wrangler.toml` es solo el valor inicial.
+  El host también puede marcarse como "no listo". Al resolverse una oferta aparece una animación (verde aceptada / roja rechazada / gris retirada).

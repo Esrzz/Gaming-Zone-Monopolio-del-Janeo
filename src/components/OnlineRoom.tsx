@@ -210,7 +210,8 @@ export default function OnlineRoom({ code, create, name, avatar, onExit, onSetti
   )
 }
 
-const RULE_FIELDS: { key: 'startingCash' | 'goSalary' | 'jailFine' | 'maxJailTurns'; label: string }[] = [
+const RULE_FIELDS: { key: 'turnSeconds' | 'startingCash' | 'goSalary' | 'jailFine' | 'maxJailTurns'; label: string }[] = [
+  { key: 'turnSeconds', label: 'Duración del turno (segundos)' },
   { key: 'startingCash', label: 'Plata inicial' },
   { key: 'goSalary', label: 'Cobro al pasar por la salida' },
   { key: 'jailFine', label: 'Multa de la cárcel' },
