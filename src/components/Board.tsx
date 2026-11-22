@@ -105,6 +105,10 @@ export default function Board({ game, seats, shown, colors, drawable = null, onD
         })}
 
         <div className="center">
+          <div className="board-art" aria-hidden="true">
+            <span className="art art-tr" />
+            <span className="art art-bl" />
+          </div>
           <h2>Monopolio del janeo</h2>
           <div
             className={`dice${diceAction ? ' clickable' : ''}${diceAction === 'roll' ? ' ready' : ''}`}

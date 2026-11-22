@@ -137,3 +137,9 @@ Comandos: `npm run server:dev` (local, puerto 8787), `npm run server:smoke` (2 c
 - Oferta de intercambio: panel en el centro del tablero para todos; solo quien la recibe acepta/rechaza y solo quien la hizo la retira.
 - El host fija la duración del turno (`rules.turnSeconds`, 15–1800 s) en el lobby; `TURN_SECONDS` de `server/wrangler.toml` es solo el valor inicial.
   El host también puede marcarse como "no listo". Al resolverse una oferta aparece una animación (verde aceptada / roja rechazada / gris retirada).
+
+## Estética
+
+- Fondo del tablero: `src/assets/board-art-tr.webp` (arriba a la derecha) y `board-art-bl.webp` (abajo a la izquierda), fundidas con `mix-blend-mode: screen`
+  y una máscara radial para que se vean como una sola textura (`.board-art` en `styles.css`). Para cambiarlas, reemplazá los archivos.
+- Títulos: fuente Bungee (`@fontsource/bungee`, local, sin depender de Google). Se cambia con la variable `--title` de `styles.css`.
