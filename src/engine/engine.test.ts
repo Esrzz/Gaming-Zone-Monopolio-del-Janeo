@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import ranking from '../data/ranking.json'
 import { BOARD, groupPositions, isBuyable } from './board'
-import { applyAction, computeRent, createGame, currentPlayer, shuffledOrder } from './engine'
+import { applyAction, computeRent, createGame, currentPlayer, isServerOnly, seededRandom, timeoutAction, toPublicState } from './engine'
 import { CHANCE_CARDS, CHEST_CARDS } from './cards'
 import type { Action, GameEvent, GameState } from './types'
 
@@ -350,28 +350,202 @@ describe('mazos de cartas', () => {
     { id: 'a', name: 'A' },
     { id: 'b', name: 'B' },
   ]
-  const seeded = (seed: number) => () => {
-    seed = (seed * 1664525 + 1013904223) % 4294967296
-    return seed / 4294967296
-  }
+  const ids = (cards: { id: string }[]) => cards.map((c) => c.id).sort()
+  const all = (s: GameState, deck: 'chance' | 'chest') => [...s.decks[deck].draw, ...s.decks[deck].discard].sort()
 
-  it('cada mazo es una permutación completa de sus cartas', () => {
+  it('cada mazo tiene todas sus cartas una sola vez', () => {
     const s = createGame(players)
-    expect([...s.chanceOrder].sort((x, y) => x - y)).toEqual(CHANCE_CARDS.map((_, i) => i))
-    expect([...s.chestOrder].sort((x, y) => x - y)).toEqual(CHEST_CARDS.map((_, i) => i))
+    expect(all(s, 'chance')).toEqual(ids(CHANCE_CARDS))
+    expect(all(s, 'chest')).toEqual(ids(CHEST_CARDS))
   })
 
-  it('el orden depende del azar inyectado: misma semilla = mismo orden, otra semilla = otro orden', () => {
-    expect(createGame(players, {}, seeded(1)).chanceOrder).toEqual(createGame(players, {}, seeded(1)).chanceOrder)
-    expect(createGame(players, {}, seeded(1)).chanceOrder).not.toEqual(createGame(players, {}, seeded(2)).chanceOrder)
-    expect(shuffledOrder(10, seeded(7))).not.toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
+  it('el orden depende de la semilla: igual semilla = igual orden, otra semilla = otro orden', () => {
+    expect(createGame(players, {}, 1).decks.chance.draw).toEqual(createGame(players, {}, 1).decks.chance.draw)
+    expect(createGame(players, {}, 1).decks.chance.draw).not.toEqual(createGame(players, {}, 2).decks.chance.draw)
   })
 
   it('las cartas salen en el orden barajado, no en el de la lista', () => {
-    let s = createGame(players, {}, seeded(3))
-    s = { ...s, current: 0, phase: 'roll', players: s.players.map((p) => ({ ...p, position: 0 })) }
-    const r = applyAction(s, { type: 'roll', player: 'a', dice: [3, 4] }) // casilla 7: Suerte
-    expect(r.ok).toBe(true)
-    if (r.ok) expect(r.state.pendingCard?.cardId).toBe(CHANCE_CARDS[s.chanceOrder[0]].id)
+    const s = createGame(players, {}, 3)
+    const top = s.decks.chance.draw[0]
+    const r = applyAction({ ...s, current: 0, phase: 'roll' }, { type: 'roll', player: 'a', dice: [3, 4] }) // casilla 7: Suerte
+    expect(r.ok && r.state.pendingCard?.cardId).toBe(top)
+  })
+
+  it('cuando se acaba el mazo se vuelve a barajar el descarte (sin perder ni repetir cartas)', () => {
+    let s = createGame(players, {}, 5)
+    const seen: string[] = []
+    const total = CHEST_CARDS.length
+    for (let i = 0; i < total * 2 + 3; i++) {
+      s = { ...s, current: 0, phase: 'roll', rollAgain: false, doubles: 0, pendingCard: null, trade: null, debts: [] }
+      s.players = s.players.map((p) => ({ ...p, position: 0, cash: 5000, inJail: false, bankrupt: false }))
+      s = run(s, { type: 'roll', player: 'a', dice: [1, 1] }).state // casilla 2: Arca
+      seen.push(s.pendingCard!.cardId)
+      // la carta se resuelve a mano: solo importa el ciclo del mazo
+      const card = CHEST_CARDS.find((c) => c.id === s.pendingCard!.cardId)!
+      s = { ...s, pendingCard: null }
+      if (card.effect.kind !== 'getOutOfJail') s.decks.chest.discard.push(card.id)
+    }
+    // la primera vuelta completa no repite cartas
+    expect(new Set(seen.slice(0, total)).size).toBe(total)
+    // y las cartas siguen siendo siempre las mismas (ninguna se pierde ni se duplica)
+    const held = CHEST_CARDS.filter((c) => c.effect.kind === 'getOutOfJail' && !all(s, 'chest').includes(c.id)).length
+    expect(all(s, 'chest').length + held).toBe(total)
+  })
+
+  it('la carta de "salí libre" no vuelve al mazo mientras la tengas, y vuelve al usarla', () => {
+    const s0 = createGame(players, {}, 9)
+    const jail = CHEST_CARDS.find((c) => c.effect.kind === 'getOutOfJail')!
+    let s = structuredClone(s0)
+    s.decks.chest.draw = [jail.id, ...s.decks.chest.draw.filter((x) => x !== jail.id)]
+    s = run({ ...s, current: 0, phase: 'roll' }, { type: 'roll', player: 'a', dice: [1, 1] }).state
+    s = run(s, { type: 'drawCard', player: 'a' }).state
+    expect(player(s, 'a').jailCards).toBe(1)
+    expect(all(s, 'chest')).not.toContain(jail.id)
+    // la usa estando preso
+    s = { ...s, phase: 'roll', current: 0, rollAgain: false, players: s.players.map((p) => (p.id === 'a' ? { ...p, inJail: true, position: 10 } : p)) }
+    s = run(s, { type: 'useJailCard', player: 'a' }).state
+    expect(player(s, 'a').jailCards).toBe(0)
+    expect(all(s, 'chest')).toContain(jail.id)
+  })
+})
+
+describe('deudas (juntar plata antes de quebrar)', () => {
+  it('si no alcanza la plata pero se puede juntar, queda una deuda y no se quiebra', () => {
+    let s = give(newGame(), [39], B) // la más cara
+    s = give(s, [1, 3], A) // A tiene propiedades para hipotecar
+    s = { ...s, players: s.players.map((p) => (p.id === A ? { ...p, cash: 10, position: 33 } : p)) }
+    const r = run(s, roll(A, 2, 4)) // 33 + 6 = 39
+    s = r.state
+    expect(player(s, A).bankrupt).toBe(false)
+    expect(s.debts).toHaveLength(1)
+    expect(s.debts[0]).toMatchObject({ from: A, to: B })
+    expect(r.events.some((e) => e.type === 'debt')).toBe(true)
+  })
+
+  it('con deuda no se puede terminar el turno ni tirar; vender/hipotecar la paga sola', () => {
+    let s = give(newGame(), [39], B)
+    s = give(s, [1, 3, 5, 6, 8, 9], A)
+    s = { ...s, players: s.players.map((p) => (p.id === A ? { ...p, cash: 10, position: 33 } : p)) }
+    s = run(s, roll(A, 2, 4)).state
+    const debt = s.debts[0].amount
+    const blocked = applyAction(s, { type: 'endTurn', player: A })
+    expect(blocked.ok).toBe(false)
+    if (!blocked.ok) expect(blocked.error).toMatch(/deuda/)
+    // hipoteca hasta juntar
+    const tiles = [1, 3, 5, 6, 8, 9]
+    let paidOff = false
+    for (const t of tiles) {
+      s = run(s, { type: 'mortgage', player: A, tile: t }).state
+      if (s.debts.length === 0) {
+        paidOff = true
+        break
+      }
+    }
+    expect(paidOff).toBe(true)
+    expect(player(s, B).cash).toBeGreaterThanOrEqual(1500 + debt)
+    expect(player(s, A).bankrupt).toBe(false)
+    s = run(s, { type: 'endTurn', player: A }).state // ya puede seguir
+    expect(currentPlayer(s).id).toBe(B)
+  })
+
+  it('si ni liquidando todo alcanza, quiebra directo', () => {
+    let s = give(newGame(), [39], B)
+    s = { ...s, players: s.players.map((p) => (p.id === A ? { ...p, cash: 10, position: 33 } : p)) }
+    s = run(s, roll(A, 2, 4)).state
+    expect(player(s, A).bankrupt).toBe(true)
+  })
+
+  it('declararse en bancarrota con una deuda le pasa los bienes al acreedor', () => {
+    let s = give(newGame(), [39], B)
+    s = give(s, [1, 3], A)
+    s = { ...s, players: s.players.map((p) => (p.id === A ? { ...p, cash: 10, position: 33 } : p)) }
+    s = run(s, roll(A, 2, 4)).state
+    s = run(s, { type: 'bankrupt', player: A }).state
+    expect(s.debts).toHaveLength(0)
+    expect(s.owned[1].owner).toBe(B)
+    expect(s.winner).toBe(B)
+  })
+
+  it('al agotarse el tiempo con una deuda, se quiebra', () => {
+    let s = give(newGame(), [39], B)
+    s = give(s, [1, 3], A)
+    s = { ...s, players: s.players.map((p) => (p.id === A ? { ...p, cash: 10, position: 33 } : p)) }
+    s = run(s, roll(A, 2, 4)).state
+    expect(timeoutAction(s)).toEqual({ type: 'bankrupt', player: A })
+  })
+})
+
+describe('multijugador: azar del motor y estado público', () => {
+  const players = [
+    { id: 'a', name: 'A' },
+    { id: 'b', name: 'B' },
+  ]
+
+  it('sin dados en la acción el motor tira, de forma reproducible con la misma semilla', () => {
+    const a = run(createGame(players, {}, 42), { type: 'roll', player: 'a' }).state
+    const b = run(createGame(players, {}, 42), { type: 'roll', player: 'a' }).state
+    expect(a.lastDice).toEqual(b.lastDice)
+    expect(a.lastDice!.every((d) => d >= 1 && d <= 6)).toBe(true)
+    expect(run(createGame(players, {}, 43), { type: 'roll', player: 'a' }).state.lastDice).toBeDefined()
+  })
+
+  it('con clientDice=false se rechazan los dados que manda el cliente', () => {
+    const s = createGame(players, {}, 1)
+    const r = applyAction(s, { type: 'roll', player: 'a', dice: [6, 6] }, { clientDice: false })
+    expect(r.ok).toBe(false)
+    expect(applyAction(s, { type: 'roll', player: 'a' }, { clientDice: false }).ok).toBe(true)
+  })
+
+  it('toda la partida es determinista: mismas acciones y semilla = mismo estado', () => {
+    const play = () => {
+      let s = createGame(players, {}, 7)
+      for (let i = 0; i < 60 && s.phase !== 'over'; i++) {
+        const act = timeoutAction(s)!
+        s = run(s, act).state
+      }
+      return s
+    }
+    expect(play()).toEqual(play())
+  })
+
+  it('el estado público oculta el orden de los mazos y la semilla, y no cambia el original', () => {
+    const s = createGame(players, {}, 1)
+    const pub = toPublicState(s)
+    expect(pub.rng).toBe(0)
+    expect(pub.decks.chance.draw.every((x) => x === '')).toBe(true)
+    expect(pub.decks.chance.draw).toHaveLength(s.decks.chance.draw.length)
+    expect(s.decks.chance.draw[0]).not.toBe('')
+  })
+
+  it('seq sube con cada acción y abandon es solo del servidor', () => {
+    let s = createGame(players, {}, 1)
+    expect(s.seq).toBe(0)
+    s = run(s, { type: 'roll', player: 'a' }).state
+    expect(s.seq).toBe(1)
+    expect(isServerOnly({ type: 'abandon', player: 'a' })).toBe(true)
+    expect(isServerOnly({ type: 'roll', player: 'a' })).toBe(false)
+  })
+
+  it('abandon: sus propiedades vuelven al banco y gana el que queda', () => {
+    let s = createGame(players, {}, 1)
+    s = give(s, [1, 3], 'a')
+    s = run(s, { type: 'abandon', player: 'a' }).state
+    expect(s.owned[1]).toBeUndefined()
+    expect(s.winner).toBe('b')
+  })
+
+  it('seededRandom es reproducible', () => {
+    const r1 = seededRandom(5)
+    const r2 = seededRandom(5)
+    expect([r1(), r1(), r1()]).toEqual([r2(), r2(), r2()])
+  })
+
+  it('timeoutAction devuelve la acción que corresponde a cada fase', () => {
+    const s = createGame(players, {}, 1)
+    expect(timeoutAction(s)).toEqual({ type: 'roll', player: 'a' })
+    expect(timeoutAction({ ...s, phase: 'buy' })).toEqual({ type: 'decline', player: 'a' })
+    expect(timeoutAction({ ...s, phase: 'card' })).toEqual({ type: 'drawCard', player: 'a' })
+    expect(timeoutAction({ ...s, phase: 'end' })).toEqual({ type: 'endTurn', player: 'a' })
+    expect(timeoutAction({ ...s, phase: 'over' })).toBeNull()
   })
 })

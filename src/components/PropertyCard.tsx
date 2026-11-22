@@ -126,10 +126,15 @@ export default function PropertyCard({ view, rules, onBuy, onDecline, onPay, onC
                 </>
               )}
               {view.mode === 'pay' && (
-                <button className="btn primary pay" data-nosound onClick={onPay}>
-                  Pagar {money(view.amount ?? 0)}
-                  {view.ownerName ? ` a ${view.ownerName}` : ''}
-                </button>
+                <>
+                  <button className="btn primary pay" data-nosound onClick={onPay}>
+                    Pagar {money(view.amount ?? 0)}
+                    {view.ownerName ? ` a ${view.ownerName}` : ''}
+                  </button>
+                  {view.cash !== undefined && view.cash < (view.amount ?? 0) && (
+                    <p className="pnote">No te alcanza: vas a tener que juntar plata (vender casas o hipotecar).</p>
+                  )}
+                </>
               )}
               {view.mode === 'info' && <span className="card-skip">Tocá afuera para cerrar</span>}
             </div>

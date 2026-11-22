@@ -31,6 +31,8 @@ export function describeEvent(e: GameEvent, name: (id: string) => string): strin
       if (e.to === 'bank') return `${name(e.from)} pagó ${money(e.amount)} al banco`
       if (e.to === 'pot') return `${name(e.from)} puso ${money(e.amount)} en el pozo`
       return null
+    case 'debt':
+      return `${name(e.from)} no tiene con qué pagar $${e.amount}${e.to === 'bank' ? ' al banco' : ` a ${name(e.to)}`}: tiene que juntar plata o declararse en bancarrota`
     case 'jackpot':
       return `${name(e.player)} se llevó el pozo: ${money(e.amount)}`
     case 'built':

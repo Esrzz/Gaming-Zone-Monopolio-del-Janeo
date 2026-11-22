@@ -76,3 +76,27 @@ su texto (se cierra con un clic o a los 4,5 s) y recién ahí se aplica el efect
 - **Gestionar** (en tu turno, antes o después de tirar): construir casas/hotel, venderlas (a la mitad) e hipotecar (el banco paga la mitad del precio; levantar la hipoteca cuesta el valor + 10%). Reglas del Monopoly original: hace falta el barrio completo sin hipotecas, se construye y vende parejo, y hay 32 casas y 12 hoteles (`housesTotal` / `hotelsTotal` en las reglas). Para hipotecar hay que vender antes las casas del barrio.
 - Casas, hoteles e hipotecas se ven en el tablero. Una propiedad con casas no se puede intercambiar.
 - **Dados**: tienen puntos; un clic los tira (en tu turno) y un clic durante la animación la acelera. El movimiento de la ficha es más lento y el sonido `Slice` se ajusta a su duración.
+
+## Plata insuficiente (deudas)
+
+Si un pago no se llega a cubrir con efectivo pero **sí** vendiendo casas e hipotecando (`liquidValue`), no hay bancarrota:
+se crea una deuda (`state.debts`, evento `debt`) y se bloquea tirar, comprar, terminar turno, etc. (`BLOCKED_BY_DEBT`)
+hasta juntar la plata. Gestionar se abre solo; apenas alcanza, la deuda se paga sola (`settleDebts`). También se puede
+declarar bancarrota (los bienes van al acreedor). Si ni liquidando todo alcanza, la bancarrota es inmediata.
+
+## Mazos
+
+Cada mazo es `{draw, discard}` de ids de carta, mezclado con el azar del motor. La carta sale de `draw` al caer, va a
+`discard` tras aplicarse (salvo "Salí de la cárcel gratis", que la guarda el jugador y vuelve al descarte al usarla o
+si quiebra). Cuando `draw` se vacía, se rebaraja el descarte.
+
+## Preparación multijugador (lógica lista, servidor pendiente)
+
+- **Azar del motor**: `state.rng` (mulberry32). `createGame(players, rules, seed|fn)`. `roll` sin `dice` tira el motor.
+  El servidor debe llamar `applyAction(state, action, { clientDice: false })` para rechazar dados del cliente.
+- `isServerOnly(action)` (`abandon`), `toPublicState(state)` (oculta orden de mazos y rng), `timeoutAction(state)`
+  (acción automática al vencer el reloj), `sanitizeRules`, `state.seq` (contador de acciones, útil para sincronizar).
+- `src/engine/lobby.ts`: salas, host, listos, reglas, inicio, `dispatch` con validaciones, desconexión con gracia de
+  2 min (`expiredMembers` → `abandon`), `publicRoom`.
+- `src/engine/protocol.ts`: mensajes cliente/servidor, `parseClientMessage`, `sanitizeChat`, `PROTOCOL_VERSION`.
+- Falta: Durable Object + WebSocket que los use, cliente online, reconexión y chat en la UI.

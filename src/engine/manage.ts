@@ -22,6 +22,21 @@ export const sellValue = (pos: number): number => {
   return t.kind === 'property' ? Math.floor(t.houseCost / 2) : 0
 }
 
+/**
+ * Plata que el jugador podría juntar si vendiera todas sus casas e hipotecara todo
+ * (sirve para decidir si una deuda se puede saldar o directamente es una bancarrota).
+ */
+export function liquidValue(s: GameState, playerId: string): number {
+  const me = s.players.find((p) => p.id === playerId)
+  let total = me?.cash ?? 0
+  for (const [pos, o] of Object.entries(s.owned)) {
+    if (o.owner !== playerId) continue
+    total += o.houses * sellValue(Number(pos))
+    if (!o.mortgaged) total += mortgageValue(Number(pos))
+  }
+  return total
+}
+
 /** Casas y hoteles que ya están en el tablero (el resto está en el banco). */
 export function buildingsInUse(s: GameState): { houses: number; hotels: number } {
   let houses = 0

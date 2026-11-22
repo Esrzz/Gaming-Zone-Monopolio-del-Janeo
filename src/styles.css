@@ -343,12 +343,14 @@ body {
 .mg-summary { display: flex; justify-content: space-between; gap: 12px; margin-bottom: 12px; padding: 8px 12px; border-radius: 12px; background: rgba(124, 58, 237, 0.1); font-size: 0.9rem; }
 .mg-list { display: grid; gap: 10px; max-height: 58vh; overflow-y: auto; padding-right: 4px; }
 .mg-group { display: grid; gap: 4px; padding: 6px; border: 1px solid var(--line); border-radius: 12px; background: rgba(124, 58, 237, 0.05); }
-.mg-row { display: grid; grid-template-columns: 10px minmax(0, 1fr) auto auto; align-items: center; gap: 10px; padding: 4px 6px; }
+.mg-row { display: grid; grid-template-columns: 10px minmax(90px, 1fr) auto auto; align-items: center; gap: 10px; padding: 4px 6px; }
 .mg-row.mortgaged .mg-name { opacity: 0.55; }
 .mg-dot { width: 10px; height: 26px; border-radius: 4px; }
 .mg-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
 .mg-name em { font-weight: 400; color: var(--idle); }
-.mg-built { font-size: 0.85rem; letter-spacing: -2px; white-space: nowrap; }
+.mg-built { display: inline-flex; gap: 1px; align-items: center; white-space: nowrap; }
+.bico { display: block; flex: none; filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.6)); }
+.mg-summary .bico { display: inline-block; vertical-align: -4px; }
 .mg-actions { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
 .mg-note { margin: 12px 0 0; font-size: 0.8rem; }
 
@@ -358,11 +360,13 @@ body {
 .side-top .bld { bottom: 2px; left: 0; right: 0; justify-content: center; }
 .side-left .bld { right: 2px; top: 0; bottom: 0; flex-direction: column; justify-content: center; }
 .side-right .bld { left: 2px; top: 0; bottom: 0; flex-direction: column; justify-content: center; }
-.bld i { display: block; width: 9px; height: 9px; border-radius: 2px; background: #35e08a; box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.55); }
-.bld i.hotel { width: 15px; background: #ff4d4d; }
 .tile.mortgaged { background: repeating-linear-gradient(135deg, rgba(120, 120, 140, 0.25) 0 6px, rgba(40, 30, 70, 0.3) 6px 12px); }
 .tile.mortgaged .tname, .tile.mortgaged .tprice, .tile.mortgaged .ticon { opacity: 0.45; }
 .tile .mtag { position: absolute; left: 0; right: 0; bottom: 3px; font: 700 clamp(0.42rem, 0.7vw, 0.58rem) var(--display); letter-spacing: 0.1em; text-transform: uppercase; color: #ffb4b4; }
 
 .row-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .row-btns .btn { display: flex; align-items: center; justify-content: center; gap: 6px; white-space: nowrap; }
+
+.debt-box { display: grid; gap: 8px; padding: 10px 12px; border-radius: 12px; border: 1px solid rgba(255, 107, 107, 0.55); background: rgba(255, 107, 107, 0.12); font-size: 0.86rem; }
+.debt-box strong { color: #ff8a8a; font: 700 1rem var(--display); }
+.mg-debt { margin: 0 0 10px; padding: 8px 12px; border-radius: 10px; border: 1px solid rgba(255, 107, 107, 0.55); background: rgba(255, 107, 107, 0.12); font-size: 0.88rem; }

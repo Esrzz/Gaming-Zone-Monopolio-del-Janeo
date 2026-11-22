@@ -2,6 +2,7 @@ import { BOARD } from '../engine'
 import type { GameState, Tile } from '../engine'
 import { GRID_TEMPLATE, GROUP_COLORS, TOKEN_SIZE, gridCell, sideOf, tokenSlot } from '../lib/layout'
 import Avatar from './Avatar'
+import { HotelIcon, HouseIcon } from './BuildingIcon'
 import CardReveal from './CardReveal'
 import Die from './Die'
 import PropertyCard from './PropertyCard'
@@ -92,7 +93,7 @@ export default function Board({ game, seats, shown, colors, drawable = null, onD
               <span className="tprice">{label(t)}</span>
               {o && o.houses > 0 && (
                 <span className="bld" aria-label={o.houses === 5 ? 'Hotel' : `${o.houses} casas`}>
-                  {o.houses === 5 ? <i className="hotel" /> : Array.from({ length: o.houses }, (_, k) => <i key={k} />)}
+                  {o.houses === 5 ? <HotelIcon size={22} /> : Array.from({ length: o.houses }, (_, k) => <HouseIcon key={k} size={16} />)}
                 </span>
               )}
               {o?.mortgaged && <span className="mtag">Hipotecada</span>}

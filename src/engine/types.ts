@@ -86,14 +86,34 @@ export interface GameState {
   winner: PlayerId | null
   /** Carta que está esperando ser robada (fase 'card') */
   pendingCard: { deck: 'chance' | 'chest'; cardId: string } | null
-  /** Orden barajado de cada mazo (índices en CHANCE_CARDS / CHEST_CARDS), fijado al crear la partida */
-  chanceOrder: number[]
-  chestOrder: number[]
-  /** Cuántas cartas se sacaron de cada mazo (el tope es `order[index % order.length]`) */
-  chanceIndex: number
-  chestIndex: number
+  /**
+   * Mazos de cartas (ids). Se roba del tope de `draw`; las cartas usadas van a `discard` y, cuando `draw` se
+   * vacía, se vuelven a barajar. La "salí libre de la cárcel" no vuelve hasta que se usa.
+   * Es información privada: los clientes reciben el estado con `toPublicState` (sin el orden de los mazos).
+   */
+  decks: Record<DeckName, Deck>
+  /** Semilla del generador de azar del motor (dados del servidor y barajado). Privada. */
+  rng: number
+  /** Cuenta de acciones aplicadas: sirve para detectar que a un cliente le faltó una actualización */
+  seq: number
+  /** Deudas pendientes: hay que juntar plata (vender casas, hipotecar, intercambiar) o declararse en bancarrota */
+  debts: Debt[]
   /** Oferta de intercambio abierta (null si no hay) */
   trade: TradeOffer | null
+}
+
+export type DeckName = 'chance' | 'chest'
+
+export interface Deck {
+  draw: string[]
+  discard: string[]
+}
+
+/** Lo que `from` le debe a `to` y todavía no pudo pagar. Mientras haya deudas no se puede avanzar el turno. */
+export interface Debt {
+  from: PlayerId
+  to: PlayerId | 'bank'
+  amount: number
 }
 
 export type CardEffect =
@@ -131,13 +151,16 @@ export interface TradeOffer {
 }
 
 export type Action =
-  | { type: 'roll'; player: PlayerId; dice: [number, number] }
+  /** Sin `dice` el motor tira (así lo hace el servidor); con `dice` se usan esos (modo de prueba) */
+  | { type: 'roll'; player: PlayerId; dice?: [number, number] }
   | { type: 'buy'; player: PlayerId }
   | { type: 'decline'; player: PlayerId }
   | { type: 'endTurn'; player: PlayerId }
   | { type: 'payJailFine'; player: PlayerId }
   | { type: 'useJailCard'; player: PlayerId }
   | { type: 'bankrupt'; player: PlayerId }
+  /** Solo la manda el servidor: el jugador se fue y no volvió; sus bienes vuelven al banco */
+  | { type: 'abandon'; player: PlayerId }
   | { type: 'drawCard'; player: PlayerId }
   | { type: 'proposeTrade'; player: PlayerId; to: PlayerId; give: TradeSide; get: TradeSide }
   | { type: 'acceptTrade'; player: PlayerId }
@@ -157,6 +180,8 @@ export type GameEvent =
   | { type: 'declined'; player: PlayerId; tile: number }
   | { type: 'rent'; from: PlayerId; to: PlayerId; tile: number; amount: number }
   | { type: 'paid'; from: PlayerId; to: PlayerId | 'bank' | 'pot'; amount: number }
+  /** No alcanzó la plata pero se puede juntar vendiendo/hipotecando: queda una deuda pendiente */
+  | { type: 'debt'; from: PlayerId; to: PlayerId | 'bank'; amount: number }
   | { type: 'jackpot'; player: PlayerId; amount: number }
   | { type: 'built'; player: PlayerId; tile: number; houses: number; cost: number }
   | { type: 'sold-house'; player: PlayerId; tile: number; houses: number; amount: number }

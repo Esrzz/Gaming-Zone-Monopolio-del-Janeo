@@ -40,6 +40,8 @@ export function sfxForEvent(e: GameEvent, viewer: string): SfxName | null {
       return 'Jail'
     case 'bankrupt':
       return 'Lose'
+    case 'debt':
+      return 'neg'
     case 'won':
       return 'Victory'
     case 'jackpot':

@@ -10,6 +10,7 @@ import {
   whyNotSell,
   whyNotUnmortgage,
 } from '../engine'
+import { HotelIcon, HouseIcon } from './BuildingIcon'
 import type { Action, GameState, Tile } from '../engine'
 import { GROUP_COLORS } from '../lib/layout'
 
@@ -19,6 +20,8 @@ interface Props {
   playerName: string
   /** Mientras hay animaciones en curso no se puede actuar */
   disabled: boolean
+  /** Deuda pendiente del jugador (se paga sola apenas junta la plata) */
+  debt?: { amount: number; to: string } | null
   onAction: (a: Action) => void
   onClose: () => void
 }
@@ -36,17 +39,17 @@ function groupKey(t: Tile): string {
 }
 
 function Buildings({ houses }: { houses: number }) {
-  if (houses === HOTEL) return <span className="mg-built hotel" title="Hotel">🏨</span>
+  if (houses === HOTEL) return <span className="mg-built hotel" title="Hotel"><HotelIcon size={22} /></span>
   if (houses === 0) return null
   return (
     <span className="mg-built" title={`${houses} casa${houses > 1 ? 's' : ''}`}>
-      {'🏠'.repeat(houses)}
+      {Array.from({ length: houses }, (_, k) => <HouseIcon key={k} size={18} />)}
     </span>
   )
 }
 
 /** Gestionar propiedades: construir, vender casas e hipotecar (como en el Monopoly original). */
-export default function ManageModal({ game, playerId, playerName, disabled, onAction, onClose }: Props) {
+export default function ManageModal({ game, playerId, playerName, disabled, debt = null, onAction, onClose }: Props) {
   const me = game.players.find((p) => p.id === playerId)!
   const mine = Object.entries(game.owned)
     .filter(([, o]) => o.owner === playerId)
@@ -76,9 +79,15 @@ export default function ManageModal({ game, playerId, playerName, disabled, onAc
               Plata <strong>{money(me.cash)}</strong>
             </span>
             <span title="Casas y hoteles que quedan en el banco">
-              🏠 {game.rules.housesTotal - used.houses} · 🏨 {game.rules.hotelsTotal - used.hotels} en el banco
+              <HouseIcon size={18} /> {game.rules.housesTotal - used.houses} · <HotelIcon size={20} /> {game.rules.hotelsTotal - used.hotels} en el banco
             </span>
           </div>
+
+          {debt && (
+            <p className="mg-debt">
+              Debés <strong>{money(debt.amount)}</strong> a {debt.to}. Te faltan <strong>{money(Math.max(0, debt.amount - me.cash))}</strong>: vendé casas o hipotecá y se paga sola.
+            </p>
+          )}
 
           {mine.length === 0 && <p className="muted">Todavía no tenés propiedades.</p>}
 

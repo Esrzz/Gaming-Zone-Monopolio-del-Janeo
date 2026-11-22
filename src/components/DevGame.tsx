@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { BOARD, applyAction, createGame, currentPlayer, isBuyable, isManageAction, priceOf } from '../engine'
+import { BOARD, applyAction, createGame, currentPlayer, isBuyable, isManageAction, priceOf, timeoutAction } from '../engine'
 import type { Action, GameState, TradeOffer } from '../engine'
 import { describeEvent, describeSide } from '../lib/describe'
 import { PLAYER_COLORS } from '../lib/layout'
@@ -34,9 +34,9 @@ const FAST_STEP_MS = 35
 const FLOAT_MS = 1800
 /**
  * Segundos que faltan cuando suena el primer tick de la cuenta regresiva. El audio tiene un tick por segundo
- * (a los 0, 1, 2 y 3 s) y el último segundo en silencio, así que con 4 los ticks caen en 4, 3, 2 y 1 s restantes.
+ * (a los 0, 1, 2 y 3 s) y el último segundo en silencio, así que con 3 los ticks caen en 3, 2, 1 y 0 s restantes.
  */
-const TIMEROUT_LEAD_S = 4
+const TIMEROUT_LEAD_S = 3
 
 const fmt = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
 
@@ -121,6 +121,8 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings }: Prop
   const nameOf = (id: string) => seats.find((s) => s.id === id)?.name ?? id
   const me = currentPlayer(game)
   const tile = BOARD[me.position]
+  const owing = game.debts.some((d) => d.from === me.id)
+  const debt = game.debts.find((d) => d.from === me.id)
   const locked = busy || game.phase === 'over'
 
   const addFloat = (player: string, amount: number) => {
@@ -210,6 +212,7 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings }: Prop
     if (alive.current) {
       setShown(Object.fromEntries(r.state.players.map((p) => [p.id, p.position])))
       setBusy(false)
+      if (r.state.debts.length > 0) setManageOpen(true) // hay que juntar plata
       // Cayó en una propiedad libre: la tarjeta sale de la casilla con la opción de comprar
       if (r.state.phase === 'buy') {
         const cur = r.state.players[r.state.current]
@@ -281,9 +284,9 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings }: Prop
       fast.current = true
       diceSound.current?.stop(150)
       moveSound.current?.stop(100)
-    } else if (!busy && game.phase === 'roll') void rollDice()
+    } else if (!busy && !owing && game.phase === 'roll') void rollDice()
   }
-  const diceAction: 'roll' | 'skip' | null = rollFaces || moving ? 'skip' : !busy && game.phase === 'roll' ? 'roll' : null
+  const diceAction: 'roll' | 'skip' | null = rollFaces || moving ? 'skip' : !busy && !owing && game.phase === 'roll' ? 'roll' : null
 
   /** Consultar una propiedad haciendo clic clic en su casilla (en cualquier momento, también fuera de turno). */
   const inspect = (pos: number) => {
@@ -291,14 +294,12 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings }: Prop
     openProp(propInfo(pos, 'info', { cash: undefined }))
   }
 
-  /** Tiempo agotado: se juega solo lo que falte para pasar el turno. */
+  /** Tiempo agotado: se juega la acción que decide el motor (`timeoutAction`; el servidor hará lo mismo). */
   const autoStep = async () => {
-    const g = live.current.game
-    const p = g.players[g.current]
-    if (g.phase === 'roll') await live.current.rollDice()
-    else if (g.phase === 'buy') await live.current.dispatch({ type: 'decline', player: p.id })
-    else if (g.phase === 'card') await live.current.dispatch({ type: 'drawCard', player: p.id })
-    else if (g.phase === 'end') await live.current.dispatch({ type: 'endTurn', player: p.id })
+    const act = timeoutAction(live.current.game)
+    if (!act) return
+    if (act.type === 'roll') await live.current.rollDice()
+    else await live.current.dispatch(act)
   }
 
   // Siempre las últimas versiones para el reloj (que corre fuera del ciclo de render)
@@ -338,8 +339,7 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings }: Prop
 
       if (ref.current <= 0 && !firing.current) {
         firing.current = true
-        const act = trade ? live.current.dispatch({ type: 'rejectTrade', player: g.trade!.to }) : live.current.autoStep()
-        void act.finally(() => {
+        void live.current.autoStep().finally(() => {
           firing.current = false
         })
       }
@@ -462,7 +462,19 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings }: Prop
                 {game.phase === 'roll' && game.rollAgain ? ' · sacó dobles, tira de nuevo' : ''}
               </p>
 
-              {game.phase === 'roll' && (
+              {owing && debt && (
+                <div className="debt-box">
+                  <strong>Tenés una deuda de ${debt.amount}</strong>
+                  <span>
+                    con {debt.to === 'bank' ? 'el banco' : nameOf(debt.to)}. Juntá plata vendiendo casas o hipotecando (se paga sola) o declarate en bancarrota.
+                  </span>
+                  <button className="btn primary" disabled={busy} onClick={() => setManageOpen(true)}>
+                    🏗️ Gestionar para pagar
+                  </button>
+                </div>
+              )}
+
+              {!owing && game.phase === 'roll' && (
                 <div className="stack">
                   <button className="btn primary" disabled={locked} onClick={rollDice}>
                     Tirar dados por {me.name}
@@ -499,7 +511,7 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings }: Prop
                 </div>
               )}
 
-              {game.phase === 'buy' && isBuyable(tile) && (
+              {!owing && game.phase === 'buy' && isBuyable(tile) && (
                 <div className="stack">
                   <button className="btn primary" disabled={locked || me.cash < priceOf(tile)} onClick={() => void dispatch({ type: 'buy', player: me.id })}>
                     Comprar {tile.name} (${priceOf(tile)})
@@ -510,7 +522,7 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings }: Prop
                 </div>
               )}
 
-              {game.phase === 'card' && game.pendingCard && (
+              {!owing && game.phase === 'card' && game.pendingCard && (
                 <div className="stack">
                   <p className="card-label">{game.pendingCard.deck === 'chance' ? '❓ Suerte' : '📦 Arcas del discord'}</p>
                   <p className="muted">Hacé clic en el mazo del tablero (o en el botón) para sacar una carta.</p>
@@ -520,7 +532,7 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings }: Prop
                 </div>
               )}
 
-              {game.phase === 'end' && (
+              {!owing && game.phase === 'end' && (
                 <button className="btn primary" disabled={locked} onClick={() => void dispatch({ type: 'endTurn', player: me.id })}>
                   Terminar turno
                 </button>
@@ -573,6 +585,7 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings }: Prop
           playerId={me.id}
           playerName={me.name}
           disabled={busy}
+          debt={debt ? { amount: debt.amount, to: debt.to === 'bank' ? 'el banco' : nameOf(debt.to) } : null}
           onAction={(a) => void dispatch(a)}
           onClose={() => setManageOpen(false)}
         />

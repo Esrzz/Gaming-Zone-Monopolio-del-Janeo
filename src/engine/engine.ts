@@ -1,7 +1,7 @@
 import { BOARD, BOARD_SIZE, JAIL_POSITION, groupPositions, isBuyable, positionsOfKind, priceOf } from './board'
 import { CHANCE_CARDS, CHEST_CARDS } from './cards'
-import type { Action, Card, GameEvent, GameState, Phase, PlayerId, PlayerState, Result, Rules } from './types'
-import { applyManageAction, isManageAction } from './manage'
+import type { Action, Card, DeckName, GameEvent, GameState, Phase, PlayerId, PlayerState, Result, Rules } from './types'
+import { applyManageAction, isManageAction, liquidValue } from './manage'
 import { applyTradeAction, cancelTradeOf, isTradeAction } from './trade'
 
 export const DEFAULT_RULES: Rules = {
@@ -20,37 +20,54 @@ export const DEFAULT_RULES: Rules = {
 export const MIN_PLAYERS = 2
 export const MAX_PLAYERS = 6
 
-/** Baraja 0..n-1 (Fisher-Yates). `random` se puede inyectar para partidas reproducibles (servidor, tests). */
-export function shuffledOrder(n: number, random: () => number = Math.random): number[] {
-  const a = Array.from({ length: n }, (_, i) => i)
-  for (let i = n - 1; i > 0; i--) {
+/** Generador de azar con semilla (mulberry32): mismo número de semilla, misma secuencia. */
+export function seededRandom(seed: number): () => number {
+  let t = seed >>> 0
+  return () => {
+    t = (t + 0x6d2b79f5) >>> 0
+    let x = Math.imul(t ^ (t >>> 15), t | 1)
+    x ^= x + Math.imul(x ^ (x >>> 7), x | 61)
+    return ((x ^ (x >>> 14)) >>> 0) / 4294967296
+  }
+}
+
+/** Siguiente número al azar del motor; avanza `s.rng`, así el estado sigue siendo 100% determinista. */
+function rngNext(s: GameState): number {
+  s.rng = (s.rng + 0x6d2b79f5) >>> 0
+  let x = Math.imul(s.rng ^ (s.rng >>> 15), s.rng | 1)
+  x ^= x + Math.imul(x ^ (x >>> 7), x | 61)
+  return ((x ^ (x >>> 14)) >>> 0) / 4294967296
+}
+
+/** Baraja una copia de la lista (Fisher-Yates). */
+function shuffled<T>(list: T[], random: () => number): T[] {
+  const a = [...list]
+  for (let i = a.length - 1; i > 0; i--) {
     const j = Math.floor(random() * (i + 1))
     ;[a[i], a[j]] = [a[j], a[i]]
   }
   return a
 }
 
-/** Carta que está en la posición `index` del mazo ya barajado de esta partida. */
-function cardAt(s: GameState, deck: 'chance' | 'chest', index: number) {
-  const cards = deck === 'chance' ? CHANCE_CARDS : CHEST_CARDS
-  const order = deck === 'chance' ? s.chanceOrder : s.chestOrder
-  return cards[order[((index % order.length) + order.length) % order.length]]
-}
+const CARDS: Record<DeckName, Card[]> = { chance: CHANCE_CARDS, chest: CHEST_CARDS }
+
+const cardById = (deck: DeckName, id: string): Card | undefined => CARDS[deck].find((c) => c.id === id)
 
 /**
- * `random` decide el orden de los mazos de cartas. El estado guarda el orden resultante, así que
- * después `applyAction` sigue siendo determinista: el servidor puede barajar una vez al crear la partida.
+ * `random` puede ser una semilla (número) o una función que devuelve números en [0, 1): decide el orden
+ * inicial de los mazos y la semilla del azar del motor. Con la misma semilla la partida es reproducible.
  */
 export function createGame(
   players: { id: PlayerId; name: string }[],
   rules: Partial<Rules> = {},
-  random: () => number = Math.random,
+  random: number | (() => number) = Math.random,
 ): GameState {
   if (players.length < MIN_PLAYERS || players.length > MAX_PLAYERS) {
     throw new Error(`La partida necesita entre ${MIN_PLAYERS} y ${MAX_PLAYERS} jugadores`)
   }
   if (new Set(players.map((p) => p.id)).size !== players.length) throw new Error('Jugadores repetidos')
-  const r: Rules = { ...DEFAULT_RULES, ...rules }
+  const rand = typeof random === 'number' ? seededRandom(random) : random
+  const r: Rules = sanitizeRules(rules)
   return {
     rules: r,
     players: players.map((p) => ({
@@ -72,12 +89,42 @@ export function createGame(
     pot: 0,
     winner: null,
     pendingCard: null,
-    chanceOrder: shuffledOrder(CHANCE_CARDS.length, random),
-    chestOrder: shuffledOrder(CHEST_CARDS.length, random),
-    chanceIndex: 0,
-    chestIndex: 0,
+    decks: {
+      chance: { draw: shuffled(CHANCE_CARDS.map((c) => c.id), rand), discard: [] },
+      chest: { draw: shuffled(CHEST_CARDS.map((c) => c.id), rand), discard: [] },
+    },
+    rng: Math.floor(rand() * 4294967296) >>> 0,
+    seq: 0,
+    debts: [],
     trade: null,
   }
+}
+
+/** Completa y acota las reglas (el servidor las usa con lo que manda el host antes de crear la partida). */
+export function sanitizeRules(input: Partial<Rules> = {}): Rules {
+  const r: Rules = { ...DEFAULT_RULES, ...input }
+  const int = (v: number, min: number, max: number, def: number) =>
+    Number.isFinite(v) ? Math.min(max, Math.max(min, Math.round(v))) : def
+  r.startingCash = int(r.startingCash, 100, 100000, DEFAULT_RULES.startingCash)
+  r.goSalary = int(r.goSalary, 0, 5000, DEFAULT_RULES.goSalary)
+  r.jailFine = int(r.jailFine, 0, 5000, DEFAULT_RULES.jailFine)
+  r.maxJailTurns = int(r.maxJailTurns, 1, 10, DEFAULT_RULES.maxJailTurns)
+  r.doublesToJail = int(r.doublesToJail, 2, 10, DEFAULT_RULES.doublesToJail)
+  r.fullSetMultiplier = int(r.fullSetMultiplier, 1, 10, DEFAULT_RULES.fullSetMultiplier)
+  r.housesTotal = int(r.housesTotal, 0, 200, DEFAULT_RULES.housesTotal)
+  r.hotelsTotal = int(r.hotelsTotal, 0, 100, DEFAULT_RULES.hotelsTotal)
+  r.platformRent =
+    Array.isArray(r.platformRent) && r.platformRent.length === 4 && r.platformRent.every((n) => Number.isFinite(n) && n >= 0)
+      ? r.platformRent.map((n) => Math.round(n))
+      : [...DEFAULT_RULES.platformRent]
+  r.freeParkingJackpot = !!r.freeParkingJackpot
+  return r
+}
+
+/** Estado que se le puede mandar a los clientes: sin el orden de los mazos ni la semilla del azar. */
+export function toPublicState(s: GameState): GameState {
+  const hide = (d: { draw: string[]; discard: string[] }) => ({ draw: d.draw.map(() => ''), discard: [...d.discard] })
+  return { ...s, rng: 0, decks: { chance: hide(s.decks.chance), chest: hide(s.decks.chest) } }
 }
 
 export function currentPlayer(s: GameState): PlayerState {
@@ -111,29 +158,63 @@ export function computeRent(s: GameState, position: number): number {
 
 const fail = (error: string): Result => ({ ok: false, error })
 
-export function applyAction(prev: GameState, action: Action): Result {
+export interface ApplyOptions {
+  /**
+   * Si es false, se rechazan las tiradas con dados que manda el cliente (`roll.dice`): el motor tira con su propio
+   * azar. El servidor del multijugador SIEMPRE tiene que usar false; el modo de prueba usa el valor por defecto (true).
+   */
+  clientDice?: boolean
+}
+
+/** Acciones que solo puede mandar el servidor (nunca un cliente). */
+export const isServerOnly = (a: Action): boolean => a.type === 'abandon'
+
+/** Acciones que no se pueden hacer mientras haya deudas pendientes. */
+const BLOCKED_BY_DEBT = new Set<Action['type']>(['roll', 'buy', 'decline', 'endTurn', 'payJailFine', 'useJailCard', 'drawCard'])
+
+export function applyAction(prev: GameState, action: Action, opts: ApplyOptions = {}): Result {
   if (prev.phase === 'over') return fail('La partida ya terminó')
   const s: GameState = structuredClone(prev)
   const ev: GameEvent[] = []
   const me = s.players.find((p) => p.id === action.player)
   if (!me || me.bankrupt) return fail('Jugador inválido')
 
-  // Declararse en bancarrota se puede en cualquier momento, aunque no sea tu turno.
-  if (action.type === 'bankrupt') {
-    goBankrupt(s, ev, me, null)
+  const done = (): Result => {
+    settleDebts(s, ev)
+    s.seq += 1
     return { ok: true, state: s, events: ev }
+  }
+
+  // Declararse en bancarrota se puede en cualquier momento, aunque no sea tu turno.
+  // Si tenés una deuda, tus bienes le pasan a quien se la debés.
+  if (action.type === 'bankrupt') {
+    const debt = s.debts.find((d) => d.from === me.id)
+    const creditor = debt && debt.to !== 'bank' ? s.players.find((p) => p.id === debt.to) ?? null : null
+    goBankrupt(s, ev, me, creditor && !creditor.bankrupt ? creditor : null)
+    return done()
+  }
+
+  // El servidor la manda cuando un jugador se desconecta y no vuelve: sus bienes vuelven al banco.
+  if (action.type === 'abandon') {
+    goBankrupt(s, ev, me, null)
+    return done()
   }
 
   // Los intercambios se responden en cualquier momento; proponerlos solo se puede en tu turno (ver trade.ts).
   if (isTradeAction(action)) {
     const error = applyTradeAction(s, ev, action)
-    return error ? fail(error) : { ok: true, state: s, events: ev }
+    return error ? fail(error) : done()
   }
 
   // Construir e hipotecar: solo en tu turno (ver manage.ts)
   if (isManageAction(action)) {
     const error = applyManageAction(s, ev, action)
-    return error ? fail(error) : { ok: true, state: s, events: ev }
+    return error ? fail(error) : done()
+  }
+
+  if (BLOCKED_BY_DEBT.has(action.type) && s.debts.length > 0) {
+    const d = s.debts[0]
+    return fail(`Primero tenés que saldar la deuda de $${d.amount}: vendé casas, hipotecá o declarate en bancarrota`)
   }
 
   if (currentPlayer(s).id !== action.player) return fail('No es tu turno')
@@ -141,7 +222,8 @@ export function applyAction(prev: GameState, action: Action): Result {
   switch (action.type) {
     case 'roll': {
       if (s.phase !== 'roll') return fail('Ahora no se puede tirar')
-      const [a, b] = action.dice
+      if (action.dice && opts.clientDice === false) return fail('Los dados los tira el servidor')
+      const [a, b] = action.dice ?? [Math.floor(rngNext(s) * 6) + 1, Math.floor(rngNext(s) * 6) + 1]
       if (![a, b].every((d) => Number.isInteger(d) && d >= 1 && d <= 6)) return fail('Dados inválidos')
       s.lastDice = [a, b]
       ev.push({ type: 'rolled', player: me.id, dice: [a, b] })
@@ -155,9 +237,9 @@ export function applyAction(prev: GameState, action: Action): Result {
           me.jailTurns += 1
           if (me.jailTurns < s.rules.maxJailTurns) {
             s.phase = 'end'
-            return { ok: true, state: s, events: ev }
+            return done()
           }
-          if (!pay(s, ev, me, s.rules.jailFine, null)) return { ok: true, state: s, events: ev }
+          if (!pay(s, ev, me, s.rules.jailFine, null)) return done()
           leaveJail(me, ev, 'forced')
         }
       } else if (dbl) {
@@ -165,7 +247,7 @@ export function applyAction(prev: GameState, action: Action): Result {
         if (s.doubles >= s.rules.doublesToJail) {
           sendToJail(s, ev, me)
           s.phase = 'end'
-          return { ok: true, state: s, events: ev }
+          return done()
         }
         s.rollAgain = true
       } else {
@@ -216,6 +298,7 @@ export function applyAction(prev: GameState, action: Action): Result {
       if (s.phase !== 'roll' || !me.inJail) return fail('No estás en la cárcel o no es el momento')
       if (me.jailCards < 1) return fail('No tenés carta de salida')
       me.jailCards -= 1
+      returnJailCard(s)
       leaveJail(me, ev, 'card')
       break
     }
@@ -223,20 +306,22 @@ export function applyAction(prev: GameState, action: Action): Result {
     case 'drawCard': {
       if (s.phase !== 'card' || !s.pendingCard) return fail('No hay carta para robar')
       const { deck, cardId } = s.pendingCard
-      const card = cardAt(s, deck, (deck === 'chance' ? s.chanceIndex : s.chestIndex) - 1)
-      if (card.id !== cardId) return fail('Carta inválida')
+      const card = cardById(deck, cardId)
+      if (!card) return fail('Carta inválida')
 
       ev.push({ type: 'card-drawn', player: me.id, deck, cardId: card.id, text: card.text })
       s.pendingCard = null
 
       applyCardEffect(s, ev, me, card.effect)
+      // La carta usada va al descarte (la "salí libre" se queda con quien la tiene hasta que la use)
+      if (card.effect.kind !== 'getOutOfJail') s.decks[deck].discard.push(card.id)
 
       if (!me.bankrupt && (s.phase as Phase) !== 'buy' && (s.phase as Phase) !== 'over') settle(s)
       break
     }
   }
 
-  return { ok: true, state: s, events: ev }
+  return done()
 }
 
 // ---------------------------------------------------------------------------
@@ -403,17 +488,13 @@ function resolveLandingWithBonus(
       }
       break
     case 'chance': {
-      const card = cardAt(s, 'chance', s.chanceIndex)
-      s.chanceIndex += 1
-      s.pendingCard = { deck: 'chance', cardId: card.id }
+      s.pendingCard = { deck: 'chance', cardId: drawFromDeck(s, 'chance') }
       s.phase = 'card'
       ev.push({ type: 'card-pending', player: p.id, deck: 'chance' })
       break
     }
     case 'chest': {
-      const card = cardAt(s, 'chest', s.chestIndex)
-      s.chestIndex += 1
-      s.pendingCard = { deck: 'chest', cardId: card.id }
+      s.pendingCard = { deck: 'chest', cardId: drawFromDeck(s, 'chest') }
       s.phase = 'card'
       ev.push({ type: 'card-pending', player: p.id, deck: 'chest' })
       break
@@ -427,8 +508,9 @@ function settle(s: GameState) {
 }
 
 /**
- * Cobra `amount`. Si no alcanza la plata, el jugador quiebra (cuando existan hipotecas y ventas
- * de casas, acá va la fase de "juntar plata" antes de quebrar). Devuelve false si quebró.
+ * Cobra `amount`. Si no alcanza la plata pero vendiendo casas e hipotecando se podría juntar, queda una deuda
+ * pendiente (ver `Debt`) y la partida espera; si ni liquidando todo alcanza, el jugador quiebra.
+ * Devuelve false solo si quebró.
  */
 function pay(s: GameState, ev: GameEvent[], from: PlayerState, amount: number, to: PlayerState | null): boolean {
   if (from.cash >= amount) {
@@ -439,12 +521,63 @@ function pay(s: GameState, ev: GameEvent[], from: PlayerState, amount: number, t
     ev.push({ type: 'paid', from: from.id, to: to ? to.id : toPot ? 'pot' : 'bank', amount })
     return true
   }
+  if (liquidValue(s, from.id) >= amount) {
+    s.debts.push({ from: from.id, to: to ? to.id : 'bank', amount })
+    ev.push({ type: 'debt', from: from.id, to: to ? to.id : 'bank', amount })
+    return true
+  }
   goBankrupt(s, ev, from, to)
   return false
 }
 
+/** Paga las deudas pendientes apenas el deudor tiene la plata (después de vender, hipotecar o intercambiar). */
+function settleDebts(s: GameState, ev: GameEvent[]) {
+  let progressed = true
+  while (progressed && s.debts.length > 0) {
+    progressed = false
+    for (let i = 0; i < s.debts.length; i++) {
+      const d = s.debts[i]
+      const debtor = s.players.find((p) => p.id === d.from)!
+      if (debtor.cash < d.amount) continue
+      s.debts.splice(i, 1)
+      const to = d.to === 'bank' ? null : s.players.find((p) => p.id === d.to) ?? null
+      pay(s, ev, debtor, d.amount, to && !to.bankrupt ? to : null)
+      progressed = true
+      break
+    }
+  }
+}
+
+/** Roba la carta de arriba del mazo; si se acabó, vuelve a barajar el descarte. */
+function drawFromDeck(s: GameState, name: DeckName): string {
+  const deck = s.decks[name]
+  if (deck.draw.length === 0) {
+    deck.draw = shuffled(deck.discard, () => rngNext(s))
+    deck.discard = []
+  }
+  return deck.draw.shift()!
+}
+
+/** Cuando se usa una carta de "salí libre de la cárcel", vuelve al mazo del que salió. */
+function returnJailCard(s: GameState) {
+  for (const name of ['chance', 'chest'] as DeckName[]) {
+    const missing = CARDS[name].find(
+      (c) =>
+        c.effect.kind === 'getOutOfJail' &&
+        !s.decks[name].draw.includes(c.id) &&
+        !s.decks[name].discard.includes(c.id) &&
+        s.pendingCard?.cardId !== c.id,
+    )
+    if (missing) {
+      s.decks[name].discard.push(missing.id)
+      return
+    }
+  }
+}
+
 function goBankrupt(s: GameState, ev: GameEvent[], p: PlayerState, creditor: PlayerState | null) {
   const wasCurrent = currentPlayer(s).id === p.id
+  const heldJail = p.jailCards
   if (creditor) creditor.cash += p.cash
   p.cash = 0
   p.bankrupt = true
@@ -457,6 +590,10 @@ function goBankrupt(s: GameState, ev: GameEvent[], p: PlayerState, creditor: Pla
   }
   if (creditor) creditor.jailCards += p.jailCards
   p.jailCards = 0
+  // Las deudas del quebrado desaparecen; las que le debían a él pasan al banco
+  s.debts = s.debts.filter((d) => d.from !== p.id).map((d) => (d.to === p.id ? { ...d, to: 'bank' as const } : d))
+  // Las cartas de salida de la cárcel que tenía vuelven a su mazo si no se las lleva un acreedor
+  if (!creditor) for (let i = 0; i < heldJail; i++) returnJailCard(s)
   ev.push({ type: 'bankrupt', player: p.id, creditor: creditor?.id ?? null })
   cancelTradeOf(s, ev, p.id)
 
@@ -479,4 +616,26 @@ function nextTurn(s: GameState, ev: GameEvent[]) {
   s.rollAgain = false
   s.pendingCard = null
   ev.push({ type: 'turn', player: currentPlayer(s).id })
+}
+
+/**
+ * Qué hacer cuando se acaba el tiempo (turno o respuesta a una oferta). El servidor aplica la acción que devuelve
+ * (o el modo de prueba, para mostrarla animada). null si no hay nada que hacer.
+ */
+export function timeoutAction(s: GameState): Action | null {
+  if (s.phase === 'over') return null
+  if (s.trade) return { type: 'rejectTrade', player: s.trade.to }
+  const p = currentPlayer(s)
+  if (s.debts.some((d) => d.from === p.id)) return { type: 'bankrupt', player: p.id }
+  switch (s.phase) {
+    case 'roll':
+      return { type: 'roll', player: p.id }
+    case 'buy':
+      return { type: 'decline', player: p.id }
+    case 'card':
+      return { type: 'drawCard', player: p.id }
+    case 'end':
+      return { type: 'endTurn', player: p.id }
+  }
+  return null
 }
