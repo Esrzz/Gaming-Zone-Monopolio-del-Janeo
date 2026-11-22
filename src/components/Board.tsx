@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { BOARD } from '../engine'
 import type { GameState, Tile } from '../engine'
+import { useView3d } from '../lib/view3d'
 import { GRID_TEMPLATE, GROUP_COLORS, TOKEN_SIZE, gridCell, sideOf, tokenSlot } from '../lib/layout'
 import Avatar from './Avatar'
 import { HotelIcon, HouseIcon } from './BuildingIcon'
@@ -68,9 +69,11 @@ export default function Board({ game, seats, shown, colors, drawable = null, onD
   const perTile: Record<number, number> = {}
   for (const s of tokens) perTile[shown[s.id] ?? 0] = (perTile[shown[s.id] ?? 0] ?? 0) + 1
   const slot: Record<number, number> = {}
+  const { active: view3d } = useView3d()
 
   return (
-    <div className="board-wrap" style={{ ['--step-ms' as string]: `${stepMs}ms` }}>
+    <div className={`board-wrap${view3d ? ' view3d' : ''}`} style={{ ['--step-ms' as string]: `${stepMs}ms` }}>
+      <div className="board-plane">
       <div className="gboard" style={{ gridTemplateColumns: GRID_TEMPLATE, gridTemplateRows: GRID_TEMPLATE }}>
         {BOARD.map((t, i) => {
           const { row, col } = gridCell(i)
@@ -150,20 +153,6 @@ export default function Board({ game, seats, shown, colors, drawable = null, onD
           </button>
         </div>
       </div>
-
-      {overlay}
-      {reveal && <CardReveal deck={reveal.deck} text={reveal.text} onClose={onCloseReveal} />}
-      {property && !reveal && (
-        <PropertyCard
-          view={property}
-          rules={game.rules}
-          onBuy={property.onBuy}
-          onDecline={property.onDecline}
-          onPay={property.onPay}
-          onClose={property.onClose}
-        />
-      )}
-
       {tokens.map((s) => {
         const pos = shown[s.id] ?? 0
         const n = (slot[pos] = (slot[pos] ?? -1) + 1)
@@ -183,6 +172,20 @@ export default function Board({ game, seats, shown, colors, drawable = null, onD
           </span>
         )
       })}
+      </div>
+
+      {overlay}
+      {reveal && <CardReveal deck={reveal.deck} text={reveal.text} onClose={onCloseReveal} />}
+      {property && !reveal && (
+        <PropertyCard
+          view={property}
+          rules={game.rules}
+          onBuy={property.onBuy}
+          onDecline={property.onDecline}
+          onPay={property.onPay}
+          onClose={property.onClose}
+        />
+      )}
     </div>
   )
 }

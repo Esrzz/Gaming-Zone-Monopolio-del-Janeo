@@ -143,3 +143,6 @@ Comandos: `npm run server:dev` (local, puerto 8787), `npm run server:smoke` (2 c
 - Fondo del tablero: `src/assets/board-art-tr.webp` (arriba a la derecha) y `board-art-bl.webp` (abajo a la izquierda), fundidas con `mix-blend-mode: screen`
   y una máscara radial para que se vean como una sola textura (`.board-art` en `styles.css`). Para cambiarlas, reemplazá los archivos.
 - Títulos: fuente Bungee (`@fontsource/bungee`, local, sin depender de Google). Se cambia con la variable `--title` de `styles.css`.
+
+### Vista 3D (opcional)
+Configuración › Video › "Vista 3D": inclina el tablero con CSS (`perspective` + `rotateX(36deg)`) y las fichas se contra-rotan para verse paradas. Por defecto está desactivada, es una preferencia local (`gz-view3d` en localStorage) y se desactiva sola en pantallas angostas (≤900px) o táctiles. Lógica en `src/lib/view3d.ts`; los overlays (trueque, cartas, ficha de propiedad) quedan fuera del plano inclinado.

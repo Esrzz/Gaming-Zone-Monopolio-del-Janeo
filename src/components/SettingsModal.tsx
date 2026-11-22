@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { setView3d, useView3d } from '../lib/view3d'
 import type { Track } from '../lib/audioManifest'
 
 type Tab = 'video' | 'audio' | 'jugabilidad' | 'otros'
@@ -25,6 +26,16 @@ export default function SettingsModal({
   onClose,
 }: Props) {
   const [tab, setTab] = useState<Tab>('audio')
+  const [trackOpen, setTrackOpen] = useState(false)
+  const view = useView3d()
+  const currentTrack = tracks.find((t) => t.file === trackFile) ?? tracks[0] ?? null
+
+  useEffect(() => {
+    if (!trackOpen) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.stopPropagation(); setTrackOpen(false) } }
+    window.addEventListener('keydown', onKey, true)
+    return () => window.removeEventListener('keydown', onKey, true)
+  }, [trackOpen])
 
   const TABS: { id: Tab; label: string }[] = [
     { id: 'video',       label: '🖥 Video' },
@@ -90,30 +101,67 @@ export default function SettingsModal({
 
               <div className="setting-row">
                 <label className="setting-label">Canción de fondo</label>
-                <div className="track-list">
-                  {tracks.length === 0 && <p className="muted">No hay canciones en public/audio/Music.</p>}
-                  {tracks.map((t, i) => {
-                    const active = (trackFile ?? tracks[0].file) === t.file
-                    return (
-                      <button
-                        key={t.file}
-                        className={`track-btn${active ? ' active' : ''}`}
-                        onClick={() => onTrack(t.file)}
-                        data-index={i}
-                      >
-                        <span className="track-icon">{active ? '▶' : '♪'}</span>
-                        {t.label}
-                      </button>
-                    )
-                  })}
-                </div>
+                {tracks.length === 0 ? (
+                  <p className="muted">No hay canciones en public/audio/Music.</p>
+                ) : (
+                  <div className="track-select">
+                    <button
+                      type="button"
+                      className="track-btn track-select-btn active"
+                      aria-haspopup="listbox"
+                      aria-expanded={trackOpen}
+                      onClick={() => setTrackOpen((o) => !o)}
+                    >
+                      <span className="track-icon">♪</span>
+                      {currentTrack?.label}
+                      <span className="caret">{trackOpen ? '▲' : '▼'}</span>
+                    </button>
+                    {trackOpen && (
+                      <div className="track-list" role="listbox">
+                        {tracks.map((t) => {
+                          const active = currentTrack?.file === t.file
+                          return (
+                            <button
+                              key={t.file}
+                              role="option"
+                              aria-selected={active}
+                              className={`track-btn${active ? ' active' : ''}`}
+                              onClick={() => { onTrack(t.file); setTrackOpen(false) }}
+                            >
+                              <span className="track-icon">{active ? '▶' : '♪'}</span>
+                              {t.label}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           )}
 
           {tab === 'video' && (
             <div className="settings-section">
-              <p className="muted">Opciones de video: próximamente.</p>
+              <div className="setting-row">
+                <label className="setting-label">
+                  Vista del tablero
+                  <span className="setting-value">{view.active ? '3D' : '2D'}</span>
+                </label>
+                <div className="check" style={{ justifyContent: 'space-between' }}>
+                  <span>Vista 3D (tablero inclinado)</span>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={view.pref}
+                    aria-label="Vista 3D"
+                    className="vtoggle"
+                    disabled={view.narrow}
+                    onClick={() => setView3d(!view.pref)}
+                  />
+                </div>
+                {view.narrow && <p className="setting-hint">No disponible en pantallas angostas o táctiles.</p>}
+              </div>
             </div>
           )}
 
