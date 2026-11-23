@@ -1,5 +1,6 @@
 export * from './types'
 export * from './board'
+export * from './ranking'
 export * from './engine'
 export * from './trade'
 export * from './manage'

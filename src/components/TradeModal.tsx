@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
-import { BOARD, isTradable, validateTrade } from '../engine'
+import { isTradable, validateTrade } from '../engine'
+import { useBoard } from '../lib/boardContext'
 import type { GameState, TradeOffer, TradeSide } from '../engine'
 import { GROUP_COLORS } from '../lib/layout'
 import type { Seat } from './Board'
@@ -23,6 +24,7 @@ const toSide = (cash: string, props: number[], jailCards: number): TradeSide => 
 })
 
 export default function TradeModal({ game, seats, colors, defaultFrom, lockFrom = false, onPropose, onClose }: Props) {
+  const board = useBoard()
   const alive = game.players.filter((p) => !p.bankrupt)
   const [from, setFrom] = useState(defaultFrom)
   const [to, setTo] = useState(alive.find((p) => p.id !== defaultFrom)?.id ?? '')
@@ -110,7 +112,7 @@ export default function TradeModal({ game, seats, colors, defaultFrom, lockFrom 
         <div className="trade-props">
           {owned.length === 0 && <p className="muted">Sin propiedades</p>}
           {owned.map((pos) => {
-            const t = BOARD[pos]
+            const t = board[pos]
             const ok = isTradable(game, pos)
             const color = t.kind === 'property' ? GROUP_COLORS[t.group] : t.kind === 'platform' ? '#9ca3af' : '#cbd5e1'
             const mortgaged = game.owned[pos].mortgaged

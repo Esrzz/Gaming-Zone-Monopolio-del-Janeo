@@ -6,6 +6,8 @@ compatibility_date = "2025-09-01"
 # Tiempos en segundos (se pueden cambiar sin tocar el código)
 TURN_SECONDS = "240"
 TRADE_SECONDS = "60"
+# De dónde se trae el ranking de juegos al crear una sala (si falla, se usa el del build)
+STATS_URL = "https://gaming-zone-api.gamingzone.workers.dev/stats.json"
 # Orígenes de la web que pueden usar el servidor, separados por coma. Vacío = cualquiera (solo para desarrollo).
 ALLOWED_ORIGINS = "https://monopolio-del-janeo.gamingzone.workers.dev,http://localhost:5173"
 

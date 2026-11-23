@@ -1,4 +1,5 @@
-import { BOARD, isBuyable, priceOf } from '../engine'
+import { isBuyable, priceOf } from '../engine'
+import { useBoard } from '../lib/boardContext'
 import type { Rules, Tile } from '../engine'
 import { GROUP_COLORS, tileCenter } from '../lib/layout'
 
@@ -65,7 +66,8 @@ function rows(t: Tile, rules: Rules): { label: string; value: string; key?: stri
 
 /** Tarjeta de propiedad: sale de la casilla (misma animación que las cartas) con la info y, según el caso, comprar o pagar. */
 export default function PropertyCard({ view, rules, onBuy, onDecline, onPay, onClose }: Props) {
-  const t = BOARD[view.pos]
+  const board = useBoard()
+  const t = board[view.pos]
   if (!isBuyable(t) || !('price' in t)) return null
   const c = tileCenter(view.pos)
   const color = stripOf(t)

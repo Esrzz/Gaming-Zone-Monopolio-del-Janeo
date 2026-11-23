@@ -1,4 +1,4 @@
-import { BOARD, groupPositions, isBuyable, priceOf } from './board'
+import { BOARD, boardOf, groupPositions, isBuyable, priceOf } from './board'
 import type { Action, GameEvent, GameState, PlayerState, TradeOffer, TradeSide } from './types'
 
 /** Interés que paga quien recibe una propiedad hipotecada (sobre el valor de la hipoteca). */
@@ -40,12 +40,12 @@ export function validateTrade(s: GameState, t: TradeOffer): string | null {
   if (isEmpty(t.give) && isEmpty(t.get)) return 'La oferta está vacía'
 
   for (const pos of t.give.properties) {
-    if (s.owned[pos]?.owner !== from.id) return `${BOARD[pos]?.name ?? 'Esa casilla'} no es de ${from.name}`
-    if (!isTradable(s, pos)) return `${BOARD[pos].name} tiene casas en su grupo: hay que venderlas antes`
+    if (s.owned[pos]?.owner !== from.id) return `${boardOf(s)[pos]?.name ?? 'Esa casilla'} no es de ${from.name}`
+    if (!isTradable(s, pos)) return `${boardOf(s)[pos].name} tiene casas en su grupo: hay que venderlas antes`
   }
   for (const pos of t.get.properties) {
-    if (s.owned[pos]?.owner !== to.id) return `${BOARD[pos]?.name ?? 'Esa casilla'} no es de ${to.name}`
-    if (!isTradable(s, pos)) return `${BOARD[pos].name} tiene casas en su grupo: hay que venderlas antes`
+    if (s.owned[pos]?.owner !== to.id) return `${boardOf(s)[pos]?.name ?? 'Esa casilla'} no es de ${to.name}`
+    if (!isTradable(s, pos)) return `${boardOf(s)[pos].name} tiene casas en su grupo: hay que venderlas antes`
   }
 
   if (t.give.jailCards > from.jailCards) return `${from.name} no tiene tantas cartas de salida`

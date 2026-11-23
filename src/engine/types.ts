@@ -74,7 +74,16 @@ export interface Ownership {
 export type Phase = 'roll' | 'buy' | 'card' | 'end' | 'over'
 
 /** Todo el estado es JSON plano: se puede guardar y mandar por red tal cual. */
+/** Un juego del ranking del server (ocupa una calle). Sale de las stats del worker al crear la sala. */
+export interface GameInfo {
+  name: string
+  hours: number
+  icon: string | null
+}
+
 export interface GameState {
+  /** Los 22 juegos de las calles, del más jugado al menos jugado (el #1 va en la calle más cara) */
+  games: GameInfo[]
   rules: Rules
   players: PlayerState[]
   owned: Record<number, Ownership>

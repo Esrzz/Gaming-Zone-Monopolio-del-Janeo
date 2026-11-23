@@ -1,6 +1,6 @@
 import { Fragment } from 'react'
 import type { ReactNode } from 'react'
-import { BOARD } from '../engine'
+import { useBoard } from '../lib/boardContext'
 import type { GameState, Tile } from '../engine'
 import { useView3d } from '../lib/view3d'
 import { GRID_TEMPLATE, GROUP_COLORS, TOKEN_SIZE, gridCell, sideOf, tokenSlot } from '../lib/layout'
@@ -69,6 +69,7 @@ function label(t: Tile): string {
 const TOKEN_SCALE_3D = 0.82
 
 export default function Board({ game, seats, shown, colors, drawable = null, onDraw, rollFaces = null, onDiceClick, diceAction = null, stepMs = 130, reveal = null, onCloseReveal, onTileClick, property = null, overlay = null }: Props) {
+  const board = useBoard()
   const tokens = seats.filter((s) => !game.players.find((p) => p.id === s.id)?.bankrupt)
   const perTile: Record<number, number> = {}
   for (const s of tokens) perTile[shown[s.id] ?? 0] = (perTile[shown[s.id] ?? 0] ?? 0) + 1
@@ -79,7 +80,7 @@ export default function Board({ game, seats, shown, colors, drawable = null, onD
     <div className={`board-wrap${view3d ? ' view3d' : ''}`} style={{ ['--step-ms' as string]: `${stepMs}ms` }}>
       <div className="board-plane">
       <div className="gboard" style={{ gridTemplateColumns: GRID_TEMPLATE, gridTemplateRows: GRID_TEMPLATE }}>
-        {BOARD.map((t, i) => {
+        {board.map((t, i) => {
           const { row, col } = gridCell(i)
           const o = game.owned[i]
           const color = stripColor(t)

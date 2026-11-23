@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
-import { BOARD, applyAction, createGame, currentPlayer, isBuyable, isManageAction, priceOf, timeoutAction } from '../engine'
+import { boardOf, applyAction, createGame, currentPlayer, isBuyable, isManageAction, priceOf, timeoutAction } from '../engine'
 import type { Action, GameEvent, GameState, TradeOffer } from '../engine'
 import { describeEvent } from '../lib/describe'
+import { BoardContext } from '../lib/boardContext'
 import { PLAYER_COLORS } from '../lib/layout'
 import Avatar from './Avatar'
 import Board from './Board'
@@ -139,7 +140,8 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings, online
   const colors = Object.fromEntries(seats.map((s, i) => [s.id, PLAYER_COLORS[i % PLAYER_COLORS.length]]))
   const nameOf = (id: string) => seats.find((s) => s.id === id)?.name ?? id
   const me = currentPlayer(game)
-  const tile = BOARD[me.position]
+  const board = boardOf(game)
+  const tile = board[me.position]
   const owing = game.debts.some((d) => d.from === me.id)
   const debt = game.debts.find((d) => d.from === me.id)
   /** En online solo actuás en tu turno; en la partida de prueba el developer maneja a todos */
@@ -264,7 +266,7 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings, online
       }
       // El registro va al ritmo de la animación (así la carta no se "spoilea")
       const line =
-        auto && e.type === 'rolled' ? `${nameOf(e.player)} sacó ${e.dice[0]} y ${e.dice[1]} (tirada automática)` : describeEvent(e, nameOf)
+        auto && e.type === 'rolled' ? `${nameOf(e.player)} sacó ${e.dice[0]} y ${e.dice[1]} (tirada automática)` : describeEvent(e, nameOf, board)
       if (line) setLog((l) => [...l, line])
     }
     apply()
@@ -484,6 +486,7 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings, online
   const shownLog = logExpanded ? log : log.slice(-4)
 
   return (
+    <BoardContext.Provider value={board}>
     <div className="game">
       <Board
         game={game}
@@ -564,7 +567,7 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings, online
                         .map((pos) => (
                           <span key={pos} className="pp">
                             <i className="pdotc" style={{ background: tileDot(pos) }} />
-                            {BOARD[pos].name}
+                            {board[pos].name}
                           </span>
                         ))}
                     </span>
@@ -742,5 +745,6 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings, online
         />
       )}
     </div>
+    </BoardContext.Provider>
   )
 }

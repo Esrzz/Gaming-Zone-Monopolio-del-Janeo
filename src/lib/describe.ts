@@ -1,13 +1,13 @@
 import { BOARD } from '../engine'
-import type { GameEvent, TradeSide } from '../engine'
+import type { GameEvent, Tile, TradeSide } from '../engine'
 
 const money = (n: number) => `$${n}`
 
 /** "$200, ROB RUN y una carta de salida" (o "nada" si el lado está vacío) */
-export function describeSide(side: TradeSide): string {
+export function describeSide(side: TradeSide, board: Tile[] = BOARD): string {
   const parts = [
     ...(side.cash > 0 ? [money(side.cash)] : []),
-    ...side.properties.map((p) => BOARD[p].name),
+    ...side.properties.map((p) => board[p].name),
     ...(side.jailCards > 0 ? [side.jailCards === 1 ? 'una carta de salida' : `${side.jailCards} cartas de salida`] : []),
   ]
   if (parts.length === 0) return 'nada'
@@ -15,16 +15,16 @@ export function describeSide(side: TradeSide): string {
 }
 
 /** Texto en español para el registro de la partida. Devuelve null si el evento no merece línea. */
-export function describeEvent(e: GameEvent, name: (id: string) => string): string | null {
+export function describeEvent(e: GameEvent, name: (id: string) => string, board: Tile[] = BOARD): string | null {
   switch (e.type) {
     case 'rolled':
       return `${name(e.player)} sacó ${e.dice[0]} y ${e.dice[1]}`
     case 'moved':
-      return `${name(e.player)} avanzó a ${BOARD[e.to].name}${e.passedGo ? ' y cobró la salida' : ''}`
+      return `${name(e.player)} avanzó a ${board[e.to].name}${e.passedGo ? ' y cobró la salida' : ''}`
     case 'bought':
-      return `${name(e.player)} compró ${BOARD[e.tile].name} por ${money(e.price)}`
+      return `${name(e.player)} compró ${board[e.tile].name} por ${money(e.price)}`
     case 'declined':
-      return `${name(e.player)} no compró ${BOARD[e.tile].name}`
+      return `${name(e.player)} no compró ${board[e.tile].name}`
     case 'rent':
       return `${name(e.from)} pagó ${money(e.amount)} de alquiler a ${name(e.to)}`
     case 'paid':
@@ -37,14 +37,14 @@ export function describeEvent(e: GameEvent, name: (id: string) => string): strin
       return `${name(e.player)} se llevó el pozo: ${money(e.amount)}`
     case 'built':
       return e.houses === 5
-        ? `${name(e.player)} construyó un hotel en ${BOARD[e.tile].name} (${money(e.cost)})`
-        : `${name(e.player)} construyó una casa en ${BOARD[e.tile].name} (${e.houses}/4) por ${money(e.cost)}`
+        ? `${name(e.player)} construyó un hotel en ${board[e.tile].name} (${money(e.cost)})`
+        : `${name(e.player)} construyó una casa en ${board[e.tile].name} (${e.houses}/4) por ${money(e.cost)}`
     case 'sold-house':
-      return `${name(e.player)} vendió ${e.houses === 4 ? 'el hotel' : 'una casa'} de ${BOARD[e.tile].name} y cobró ${money(e.amount)}`
+      return `${name(e.player)} vendió ${e.houses === 4 ? 'el hotel' : 'una casa'} de ${board[e.tile].name} y cobró ${money(e.amount)}`
     case 'mortgaged':
-      return `${name(e.player)} hipotecó ${BOARD[e.tile].name} y cobró ${money(e.amount)}`
+      return `${name(e.player)} hipotecó ${board[e.tile].name} y cobró ${money(e.amount)}`
     case 'unmortgaged':
-      return `${name(e.player)} levantó la hipoteca de ${BOARD[e.tile].name} por ${money(e.cost)}`
+      return `${name(e.player)} levantó la hipoteca de ${board[e.tile].name} por ${money(e.cost)}`
     case 'jailed':
       return `${name(e.player)} va a la cárcel`
     case 'left-jail': {

@@ -1,5 +1,6 @@
 import { MAX_PLAYERS, MIN_PLAYERS, applyAction, createGame, isServerOnly, sanitizeRules, toPublicState } from './engine'
-import type { Action, GameEvent, GameState, PlayerId, Rules } from './types'
+import { sanitizeGames } from './ranking'
+import type { Action, GameEvent, GameInfo, GameState, PlayerId, Rules } from './types'
 
 /**
  * Lógica pura de una sala de multijugador (lobby → partida → fin). No sabe nada de red ni de reloj:
@@ -28,6 +29,8 @@ export interface Room {
   status: RoomStatus
   members: Member[]
   rules: Rules
+  /** Ranking de juegos con el que se arma el tablero (lo trae el servidor al crear la sala; sin él, el del build) */
+  games?: GameInfo[]
   /** Hay partida cuando status es 'playing' o 'finished' */
   game: GameState | null
 }
@@ -48,8 +51,9 @@ export function makeRoomCode(random: () => number = Math.random, length = 5): st
   return Array.from({ length }, () => alphabet[Math.floor(random() * alphabet.length)]).join('')
 }
 
-export function createRoom(code: string, host: { id: PlayerId; name: string; avatar?: string | null }): Room {
+export function createRoom(code: string, host: { id: PlayerId; name: string; avatar?: string | null }, games?: GameInfo[]): Room {
   return {
+    ...(games ? { games: sanitizeGames(games) } : {}),
     code,
     hostId: host.id,
     status: 'lobby',
@@ -129,6 +133,7 @@ export function startGame(room: Room, requester: PlayerId, seed?: number): RoomR
     r.members.map((m) => ({ id: m.id, name: m.name })),
     r.rules,
     seed ?? Math.random,
+    r.games,
   )
   r.status = 'playing'
   return ok(r)

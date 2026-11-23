@@ -1,4 +1,4 @@
-import { BOARD } from '../engine'
+import { useBoard } from '../lib/boardContext'
 import type { TradeOffer, TradeSide } from '../engine'
 import { tileDot } from '../lib/tileColor'
 
@@ -20,6 +20,7 @@ interface Props {
 const fmt = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
 
 function Side({ side }: { side: TradeSide }) {
+  const board = useBoard()
   const empty = side.cash <= 0 && side.properties.length === 0 && side.jailCards <= 0
   return (
     <ul className="tside">
@@ -27,7 +28,7 @@ function Side({ side }: { side: TradeSide }) {
       {side.properties.map((p) => (
         <li key={p}>
           <i className="pdotc" style={{ background: tileDot(p) }} />
-          {BOARD[p].name}
+          {board[p].name}
         </li>
       ))}
       {side.jailCards > 0 && <li>🎟️ {side.jailCards === 1 ? 'Carta de salida' : `${side.jailCards} cartas de salida`}</li>}

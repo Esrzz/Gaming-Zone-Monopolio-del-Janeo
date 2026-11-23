@@ -1,6 +1,7 @@
-import { BOARD, BOARD_SIZE, JAIL_POSITION, groupPositions, isBuyable, positionsOfKind, priceOf } from './board'
+import { BOARD, BOARD_SIZE, DEFAULT_GAMES, JAIL_POSITION, groupPositions, isBuyable, positionsOfKind, priceOf } from './board'
+import { sanitizeGames } from './ranking'
 import { CHANCE_CARDS, CHEST_CARDS } from './cards'
-import type { Action, Card, DeckName, GameEvent, GameState, Phase, PlayerId, PlayerState, Result, Rules } from './types'
+import type { Action, Card, DeckName, GameEvent, GameInfo, GameState, Phase, PlayerId, PlayerState, Result, Rules } from './types'
 import { applyManageAction, isManageAction, liquidValue } from './manage'
 import { applyTradeAction, cancelTradeOf, isTradeAction } from './trade'
 
@@ -62,6 +63,7 @@ export function createGame(
   players: { id: PlayerId; name: string }[],
   rules: Partial<Rules> = {},
   random: number | (() => number) = Math.random,
+  games?: GameInfo[],
 ): GameState {
   if (players.length < MIN_PLAYERS || players.length > MAX_PLAYERS) {
     throw new Error(`La partida necesita entre ${MIN_PLAYERS} y ${MAX_PLAYERS} jugadores`)
@@ -70,6 +72,7 @@ export function createGame(
   const rand = typeof random === 'number' ? seededRandom(random) : random
   const r: Rules = sanitizeRules(rules)
   return {
+    games: sanitizeGames(games ?? DEFAULT_GAMES),
     rules: r,
     players: players.map((p) => ({
       id: p.id,

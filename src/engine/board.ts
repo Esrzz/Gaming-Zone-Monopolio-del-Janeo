@@ -1,5 +1,5 @@
 import ranking from '../data/ranking.json'
-import type { GroupId, RentTable, Tile } from './types'
+import type { GameInfo, GroupId, RentTable, Tile } from './types'
 
 export const BOARD_SIZE = 40
 export const JAIL_POSITION = 10
@@ -37,7 +37,10 @@ const STREET_SLOTS: { pos: number; group: GroupId; price: number; rent: RentTabl
  * Los juegos más jugados del server (ver scripts/ranking.mjs) ocupan las calles más caras:
  * el #1 va en la casilla 39 (la más cara) y el #22 en la casilla 1 (la más barata).
  */
-const STREET_GAMES = ranking.slice(0, STREET_SLOTS.length)
+export const STREET_COUNT = STREET_SLOTS.length
+
+/** Ranking incluido en el build: es el de respaldo cuando no se pudo pedir uno actualizado. */
+export const DEFAULT_GAMES: GameInfo[] = (ranking as GameInfo[]).slice(0, STREET_COUNT)
 
 const platform = (name: string, icon: string, description?: string): Tile => ({ kind: 'platform', name, price: 200, icon, description })
 const utility = (name: string, icon: string, description?: string): Tile => ({ kind: 'utility', name, price: 150, icon, description })
@@ -64,15 +67,34 @@ const FIXED: Record<number, Tile> =  {
   38: { kind: 'tax', name: 'Impuesto al carreo', amount: 100 },
 }
 
-export const BOARD: Tile[] = Array.from({ length: BOARD_SIZE }, (_, i): Tile => {
-  const fixed = FIXED[i]
-  if (fixed) return fixed
-  const slot = STREET_SLOTS.findIndex((s) => s.pos === i)
-  const { group, price, rent, houseCost, description } = STREET_SLOTS[slot]
-  // slot 0 = casilla más barata = juego menos jugado de los 22
-  const game = STREET_GAMES[STREET_SLOTS.length - 1 - slot]
-  return { kind: 'property', name: game.name, group, price, rent, houseCost, icon: game.icon, description }
-})
+/** Arma el tablero con los juegos dados (del más jugado al menos jugado). Las reglas no dependen de cuáles sean. */
+export function buildBoard(games: GameInfo[]): Tile[] {
+  return Array.from({ length: BOARD_SIZE }, (_, i): Tile => {
+    const fixed = FIXED[i]
+    if (fixed) return fixed
+    const slot = STREET_SLOTS.findIndex((s) => s.pos === i)
+    const { group, price, rent, houseCost, description } = STREET_SLOTS[slot]
+    // slot 0 = casilla más barata = juego menos jugado de los 22
+    const game = games[STREET_COUNT - 1 - slot] ?? DEFAULT_GAMES[STREET_COUNT - 1 - slot]
+    return { kind: 'property', name: game.name, group, price, rent, houseCost, icon: game.icon ?? undefined, description }
+  })
+}
+
+/**
+ * Tablero por defecto. Sirve para las reglas (grupos, precios, alquileres), que son iguales en todas las partidas;
+ * para mostrar los nombres e íconos de una partida concreta usar `boardOf(game)`.
+ */
+export const BOARD: Tile[] = buildBoard(DEFAULT_GAMES)
+
+const boards = new WeakMap<GameInfo[], Tile[]>()
+/** Tablero con los juegos de esa partida (se arma una sola vez por lista de juegos). */
+export function boardOf(game: { games?: GameInfo[] } | null | undefined): Tile[] {
+  const g = game?.games
+  if (!g) return BOARD
+  let b = boards.get(g)
+  if (!b) { b = buildBoard(g); boards.set(g, b) }
+  return b
+}
 
 export function isBuyable(tile: Tile): boolean {
   return tile.kind === 'property' || tile.kind === 'platform' || tile.kind === 'utility'

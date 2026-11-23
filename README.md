@@ -146,3 +146,6 @@ Comandos: `npm run server:dev` (local, puerto 8787), `npm run server:smoke` (2 c
 
 ### Vista 3D (opcional)
 Configuración › Video › "Vista 3D": inclina el tablero con CSS (`perspective` + `rotateX(36deg)`) y las fichas se contra-rotan para verse paradas. Por defecto está desactivada, es una preferencia local (`gz-view3d` en localStorage) y se desactiva sola en pantallas angostas (≤900px) o táctiles. Lógica en `src/lib/view3d.ts`; los overlays (trueque, cartas, ficha de propiedad) quedan fuera del plano inclinado.
+
+### Ranking de juegos en vivo
+Al crear una sala, el servidor le pide el `stats.json` al worker de stats (`STATS_URL` en `server/wrangler.toml`), calcula las horas por juego (`rankingFromStats`) y guarda los 22 primeros en la sala (`Room.games` → `GameState.games`). Todos los jugadores ven el mismo tablero, y el #1 va a la calle más cara. Si el worker no responde en 3 s o devuelve algo raro, se usa el `src/data/ranking.json` del build (se regenera con `scripts/ranking.mjs`). El resultado se guarda 5 minutos en memoria. Las reglas (grupos, precios, alquileres) no dependen de qué juegos haya: solo cambian nombres e íconos (`boardOf(game)`; en la UI, `useBoard()`).

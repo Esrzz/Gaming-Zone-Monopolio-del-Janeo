@@ -25,6 +25,7 @@ import {
 } from '../../src/engine'
 import type { Clock, ClockConfig, ClientMessage, GameEvent, Room, Rules, ServerMessage } from '../../src/engine'
 import type { Env } from './env'
+import { fetchGames } from './ranking'
 
 /** En el lobby, un desconectado se saca a los 30 s (en partida rige RECONNECT_GRACE_MS = 2 min) */
 const LOBBY_GRACE_MS = 30_000
@@ -147,10 +148,12 @@ export class GameRoom extends DurableObject<Env> {
     const who = { id: att.id, name: msg.name, avatar: cleanAvatar(msg.avatar) }
     const now = Date.now()
 
+    // se pide el ranking antes de decidir si hay que crear la sala: así no hay un await en medio (otro mensaje podría colarse)
+    const games = !this.st && att.create ? await fetchGames(this.env) : undefined
     let room: Room
     if (!this.st) {
       if (!att.create) return this.send(ws, { t: 'error', error: 'Esa sala no existe' })
-      room = createRoom(att.code, who)
+      room = createRoom(att.code, who, games)
       const turn = Number(this.env.TURN_SECONDS)
       if (turn > 0) room = { ...room, rules: sanitizeRules({ ...room.rules, turnSeconds: turn }) }
       this.st = { room, clock: emptyClock(), version: 0, finishedAt: null }

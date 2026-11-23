@@ -1,5 +1,4 @@
 import {
-  BOARD,
   HOTEL,
   buildingsInUse,
   mortgageValue,
@@ -10,6 +9,7 @@ import {
   whyNotSell,
   whyNotUnmortgage,
 } from '../engine'
+import { useBoard } from '../lib/boardContext'
 import { HotelIcon, HouseIcon } from './BuildingIcon'
 import type { Action, GameState, Tile } from '../engine'
 import { GROUP_COLORS } from '../lib/layout'
@@ -50,6 +50,7 @@ function Buildings({ houses }: { houses: number }) {
 
 /** Gestionar propiedades: construir, vender casas e hipotecar (como en el Monopoly original). */
 export default function ManageModal({ game, playerId, playerName, disabled, debt = null, onAction, onClose }: Props) {
+  const board = useBoard()
   const me = game.players.find((p) => p.id === playerId)!
   const mine = Object.entries(game.owned)
     .filter(([, o]) => o.owner === playerId)
@@ -58,7 +59,7 @@ export default function ManageModal({ game, playerId, playerName, disabled, debt
   const used = buildingsInUse(game)
   const groups = new Map<string, number[]>()
   for (const pos of mine) {
-    const k = groupKey(BOARD[pos])
+    const k = groupKey(board[pos])
     groups.set(k, [...(groups.get(k) ?? []), pos])
   }
 
@@ -95,7 +96,7 @@ export default function ManageModal({ game, playerId, playerName, disabled, debt
             {[...groups.values()].map((positions) => (
               <section key={positions[0]} className="mg-group">
                 {positions.map((pos) => {
-                  const t = BOARD[pos]
+                  const t = board[pos]
                   const o = game.owned[pos]
                   const isStreet = t.kind === 'property'
                   const build = isStreet ? whyNotBuild(game, playerId, pos) : 'Solo en propiedades de color'
