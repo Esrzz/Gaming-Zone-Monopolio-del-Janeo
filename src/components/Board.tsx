@@ -65,6 +65,9 @@ function label(t: Tile): string {
   }
 }
 
+/** En 3D las fichas son algo más chicas: así caben de a dos por casilla lateral sin invadir la vecina. */
+const TOKEN_SCALE_3D = 0.82
+
 export default function Board({ game, seats, shown, colors, drawable = null, onDraw, rollFaces = null, onDiceClick, diceAction = null, stepMs = 130, reveal = null, onCloseReveal, onTileClick, property = null, overlay = null }: Props) {
   const tokens = seats.filter((s) => !game.players.find((p) => p.id === s.id)?.bankrupt)
   const perTile: Record<number, number> = {}
@@ -157,8 +160,9 @@ export default function Board({ game, seats, shown, colors, drawable = null, onD
       {tokens.map((s) => {
         const pos = shown[s.id] ?? 0
         const n = (slot[pos] = (slot[pos] ?? -1) + 1)
-        const c = tokenSlot(pos, n, perTile[pos] ?? 1)
-        const place = { left: `${c.x}%`, top: `${c.y}%`, width: `${TOKEN_SIZE}%` }
+        const size = view3d ? TOKEN_SIZE * TOKEN_SCALE_3D : TOKEN_SIZE
+        const c = tokenSlot(pos, n, perTile[pos] ?? 1, size)
+        const place = { left: `${c.x}%`, top: `${c.y}%`, width: `${size}%` }
         return (
           <Fragment key={s.id}>
             {view3d && <span className="token-shadow" style={place} />}

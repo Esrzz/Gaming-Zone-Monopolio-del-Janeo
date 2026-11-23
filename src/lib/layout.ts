@@ -56,16 +56,16 @@ export const TOKEN_SIZE = 3.8
  * que aprovecha el ancho y alto de la casilla, así nunca quedan una encima de otra (hasta 6 jugadores).
  * Devuelve el centro en % del tablero.
  */
-export function tokenSlot(pos: number, index: number, count: number): { x: number; y: number } {
+export function tokenSlot(pos: number, index: number, count: number, size = TOKEN_SIZE): { x: number; y: number } {
   const { row, col } = gridCell(pos)
   const unit = 100 / TOTAL
   const w = SIZES[col - 1] * unit
   const h = SIZES[row - 1] * unit
   const c = tileCenter(pos)
-  const gap = TOKEN_SIZE * 1.06
+  const gap = size * 1.06
   const perRow = Math.max(1, Math.floor(w / gap))
   const rows = Math.ceil(count / perRow)
-  const stepY = rows > 1 ? Math.min(gap, (h - TOKEN_SIZE) / (rows - 1)) : 0
+  const stepY = rows > 1 ? Math.min(gap, (h - size) / (rows - 1)) : 0
   const r = Math.floor(index / perRow)
   const inRow = r === rows - 1 ? count - r * perRow : perRow
   const k = index - r * perRow
