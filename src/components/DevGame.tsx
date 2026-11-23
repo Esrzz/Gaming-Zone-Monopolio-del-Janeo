@@ -41,6 +41,9 @@ const FLOAT_MS = 1800
  * (a los 0, 1, 2 y 3 s) y el último segundo en silencio, así que con 3 los ticks caen en 3, 2, 1 y 0 s restantes.
  */
 const TIMEROUT_LEAD_S = 3
+/** Desde este segundo del audio empieza el último tick (el del 0): una vez ahí se deja terminar aunque el turno ya haya cambiado. */
+const TIMEROUT_LAST_TICK_S = 2.95
+const TIMEROUT_END_S = 3.6
 
 const fmt = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
 
@@ -103,7 +106,7 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings, online
   const turnMs = useRef(game.rules.turnSeconds * 1000)
   const tradeMs = useRef(TRADE_SECONDS * 1000)
   const firing = useRef(false)
-  const beep = useRef<{ key: string; h: SfxHandle } | null>(null)
+  const beep = useRef<{ key: string; h: SfxHandle; t0: number } | null>(null)
 
   useEffect(() => {
     alive.current = true
@@ -441,8 +444,16 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings, online
   // Reloj: corre durante todo el turno; en pausa mientras hay animaciones. Con una oferta abierta, corre el de quien la recibe.
   useEffect(() => {
     let last = performance.now()
+    /** Corta la cuenta regresiva (se reinició el reloj, hay animación…). El último tick, el del 0, no se corta: sigue hasta el final. */
     const stopBeep = () => {
-      beep.current?.h.stop()
+      const b = beep.current
+      if (!b) return
+      const pos = (performance.now() - b.t0) / 1000
+      if (pos >= TIMEROUT_LAST_TICK_S) {
+        if (pos > TIMEROUT_END_S) beep.current = null
+        return
+      }
+      b.h.stop()
       beep.current = null
     }
     const iv = setInterval(() => {
@@ -463,7 +474,8 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings, online
       if (ref.current > 0 && ref.current <= leadMs) {
         if (beep.current?.key !== key) {
           stopBeep()
-          beep.current = { key, h: play('timerout', { variant: 0, startAt: (leadMs - ref.current) / 1000 }) }
+          const startAt = (leadMs - ref.current) / 1000
+          beep.current = { key, t0: performance.now() - startAt * 1000, h: play('timerout', { variant: 0, startAt }) }
         }
       } else if (beep.current && ref.current > leadMs) {
         stopBeep() // el reloj se reinició (acción del jugador, oferta resuelta…)
@@ -478,8 +490,7 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings, online
     }, 100)
     return () => {
       clearInterval(iv)
-      beep.current?.h.stop()
-      beep.current = null
+      stopBeep()
     }
   }, [])
 
@@ -546,8 +557,7 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings, online
                   <span className="pdot" style={{ background: colors[p.id] }} />
                   <Avatar name={seat.name} src={seat.avatar} size={24} />
                   <span className="pname">
-                    {i === game.current && game.phase !== 'over' && !p.bankrupt && <span className="turn-mark">▶</span>}
-                    {p.name}
+                                        {p.name}
                     {p.inJail && <em> · cárcel</em>}
                     {p.bankrupt && <em> · quebró</em>}
                     {online?.offline.includes(p.id) && !p.bankrupt && <em> · sin conexión</em>}

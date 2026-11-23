@@ -449,7 +449,6 @@ body {
 .plist li.turn { border-color: #c4b5fd; background: linear-gradient(90deg, rgba(124, 58, 237, 0.42), rgba(124, 58, 237, 0.12)); box-shadow: 0 0 0 1px rgba(196, 181, 253, 0.45), 0 0 20px -4px rgba(139, 92, 246, 0.95); }
 .plist li.turn .pname { font-weight: 800; }
 .plist li.turn .pdot { animation: turnpulse 1.2s ease-in-out infinite; }
-.turn-mark { color: #fde68a; margin-right: 4px; }
 @keyframes turnpulse { 0%, 100% { transform: scaleY(1); opacity: 1; } 50% { transform: scaleY(0.55); opacity: 0.6; } }
 .pprops { display: flex; flex-wrap: wrap; gap: 3px 9px; }
 .pprops .pp { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
