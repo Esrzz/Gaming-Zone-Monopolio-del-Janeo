@@ -1,3 +1,4 @@
+import { Fragment } from 'react'
 import type { ReactNode } from 'react'
 import { BOARD } from '../engine'
 import type { GameState, Tile } from '../engine'
@@ -157,19 +158,14 @@ export default function Board({ game, seats, shown, colors, drawable = null, onD
         const pos = shown[s.id] ?? 0
         const n = (slot[pos] = (slot[pos] ?? -1) + 1)
         const c = tokenSlot(pos, n, perTile[pos] ?? 1)
+        const place = { left: `${c.x}%`, top: `${c.y}%`, width: `${TOKEN_SIZE}%` }
         return (
-          <span
-            key={s.id}
-            className="token"
-            style={{
-              left: `${c.x}%`,
-              top: `${c.y}%`,
-              width: `${TOKEN_SIZE}%`,
-              ['--c' as string]: colors[s.id],
-            }}
-          >
-            <Avatar name={s.name} src={s.avatar} size={48} />
-          </span>
+          <Fragment key={s.id}>
+            {view3d && <span className="token-shadow" style={place} />}
+            <span className="token" style={{ ...place, ['--c' as string]: colors[s.id] }}>
+              <Avatar name={s.name} src={s.avatar} size={48} />
+            </span>
+          </Fragment>
         )
       })}
       </div>
