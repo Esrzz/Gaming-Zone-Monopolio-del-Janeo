@@ -3,6 +3,7 @@ import { boardOf, applyAction, createGame, currentPlayer, isBuyable, isManageAct
 import type { Action, GameEvent, GameState, TradeOffer } from '../engine'
 import { describeEvent } from '../lib/describe'
 import { BoardContext } from '../lib/boardContext'
+import { useHotkeys } from '../lib/useHotkeys'
 import { PLAYER_COLORS } from '../lib/layout'
 import Avatar from './Avatar'
 import Board from './Board'
@@ -384,6 +385,39 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings, online
     } else if (!busy && mine && !owing && game.phase === 'roll') void rollDice()
   }
   const diceAction: 'roll' | 'skip' | null = (rollFaces || moving) && mine ? 'skip' : rollFaces || moving ? null : !busy && mine && !owing && game.phase === 'roll' ? 'roll' : null
+
+  /** Atajos de teclado (Configuración › Jugabilidad): hacen lo mismo que los botones y respetan las mismas condiciones. */
+  const canAnswerOffer = !!game.trade && game.phase !== 'over' && !busy && !tradeFx && (!online || game.trade.to === online.you)
+  useHotkeys({
+    fast: () => {
+      if (!mine) return
+      if (rollFaces || moving) { diceClick(); return true }
+      if (reveal) { closeReveal.current?.(); online?.sendUi('closeCard', playingSeq.current ?? game.seq); return true }
+    },
+    roll: () => {
+      if (!busy && mine && !owing && game.phase === 'roll' && !rollFaces && !moving) { void rollDice(); return true }
+    },
+    accept: () => {
+      if (!canAnswerOffer) return
+      void dispatch({ type: 'acceptTrade', player: game.trade!.to })
+      return true
+    },
+    reject: () => {
+      if (!canAnswerOffer) return
+      void dispatch({ type: 'rejectTrade', player: game.trade!.to })
+      return true
+    },
+    manage: () => {
+      if (locked) return
+      setManageOpen(true)
+      return true
+    },
+    trade: () => {
+      if (locked || game.trade) return
+      setTradeOpen(true)
+      return true
+    },
+  })
 
   /** Consultar una propiedad haciendo clic clic en su casilla (en cualquier momento, también fuera de turno). */
   const inspect = (pos: number) => {

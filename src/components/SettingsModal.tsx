@@ -1,5 +1,9 @@
 import { useEffect, useState } from 'react'
+import { UI_SCALE_MAX, UI_SCALE_MIN, UI_SCALE_STEP } from '../engine'
+import { updateSettings, useSettings } from '../lib/settingsStore'
+import { useFullscreen } from '../lib/useFullscreen'
 import { setView3d, useView3d } from '../lib/view3d'
+import HotkeysModal from './HotkeysModal'
 import type { Track } from '../lib/audioManifest'
 
 type Tab = 'video' | 'audio' | 'jugabilidad' | 'otros'
@@ -28,6 +32,9 @@ export default function SettingsModal({
   const [tab, setTab] = useState<Tab>('audio')
   const [trackOpen, setTrackOpen] = useState(false)
   const view = useView3d()
+  const fs = useFullscreen()
+  const gameplay = useSettings().gameplay
+  const [hotkeysOpen, setHotkeysOpen] = useState(false)
   const currentTrack = tracks.find((t) => t.file === trackFile) ?? tracks[0] ?? null
 
   useEffect(() => {
@@ -162,12 +169,75 @@ export default function SettingsModal({
                 </div>
                 {view.narrow && <p className="setting-hint">No disponible en pantallas angostas o táctiles.</p>}
               </div>
+
+              <div className="setting-row">
+                <label className="setting-label">
+                  Pantalla completa
+                  <span className="setting-value">{fs.on ? 'Sí' : 'No'}</span>
+                </label>
+                <div className="check" style={{ justifyContent: 'space-between' }}>
+                  <span>Ocupar toda la pantalla</span>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={fs.on}
+                    aria-label="Pantalla completa"
+                    className="vtoggle"
+                    disabled={!fs.supported}
+                    onClick={() => void fs.toggle()}
+                  />
+                </div>
+                {!fs.supported && <p className="setting-hint">Tu navegador no permite la pantalla completa.</p>}
+              </div>
             </div>
           )}
 
           {tab === 'jugabilidad' && (
             <div className="settings-section">
-              <p className="muted">Opciones de jugabilidad: próximamente.</p>
+              <div className="setting-row">
+                <label className="setting-label">
+                  Tamaño de la interfaz
+                  <span className="setting-value">{gameplay.uiScale}%</span>
+                </label>
+                <input
+                  type="range"
+                  className="slider"
+                  aria-label="Tamaño de la interfaz"
+                  min={UI_SCALE_MIN}
+                  max={UI_SCALE_MAX}
+                  step={UI_SCALE_STEP}
+                  value={gameplay.uiScale}
+                  onChange={(e) => updateSettings((s) => { s.gameplay.uiScale = Number(e.target.value) })}
+                />
+                <div className="setting-hint scale-hint">
+                  <span>{UI_SCALE_MIN}%</span>
+                  <button type="button" className="link-btn" disabled={gameplay.uiScale === 100} onClick={() => updateSettings((s) => { s.gameplay.uiScale = 100 })}>
+                    Volver a 100%
+                  </button>
+                  <span>{UI_SCALE_MAX}%</span>
+                </div>
+              </div>
+
+              <div className="setting-row">
+                <label className="setting-label">
+                  Atajos de teclado
+                  <span className="setting-value">{gameplay.hotkeysEnabled ? 'Sí' : 'No'}</span>
+                </label>
+                <div className="check" style={{ justifyContent: 'space-between' }}>
+                  <span>Habilitar atajos de teclado</span>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={gameplay.hotkeysEnabled}
+                    aria-label="Habilitar atajos de teclado"
+                    className="vtoggle"
+                    onClick={() => updateSettings((s) => { s.gameplay.hotkeysEnabled = !s.gameplay.hotkeysEnabled })}
+                  />
+                </div>
+                <button type="button" className="btn ghost" onClick={() => setHotkeysOpen(true)}>
+                  ⌨️ Personalizar atajos
+                </button>
+              </div>
             </div>
           )}
 
@@ -178,6 +248,7 @@ export default function SettingsModal({
           )}
         </div>
       </div>
+      {hotkeysOpen && <HotkeysModal onClose={() => setHotkeysOpen(false)} />}
     </div>
   )
 }

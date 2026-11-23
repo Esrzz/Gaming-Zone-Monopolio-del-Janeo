@@ -65,7 +65,7 @@ function cleanAvatar(a: string | null | undefined): string | null {
 }
 
 /** El id público del jugador sale de un hash de su token secreto: nadie puede hacerse pasar por otro con solo ver el id. */
-async function idFromToken(token: string): Promise<string> {
+export async function idFromToken(token: string): Promise<string> {
   const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(token))
   return 'p' + [...new Uint8Array(buf).slice(0, 6)].map((b) => b.toString(16).padStart(2, '0')).join('')
 }

@@ -1,7 +1,9 @@
 import { makeRoomCode } from '../../src/engine'
 import type { Env } from './env'
+import { idFromToken } from './room'
 
 export { GameRoom } from './room'
+export { ProfileStore } from './profile'
 
 const json = (body: unknown, init: ResponseInit = {}, cors: Record<string, string> = {}) =>
   new Response(JSON.stringify(body), { ...init, headers: { 'content-type': 'application/json', ...cors } })
@@ -29,11 +31,21 @@ export default {
       : {}
 
     if (req.method === 'OPTIONS') {
-      return new Response(null, { status: 204, headers: { ...cors, 'access-control-allow-methods': 'GET, POST, OPTIONS', 'access-control-allow-headers': 'content-type' } })
+      return new Response(null, { status: 204, headers: { ...cors, 'access-control-allow-methods': 'GET, POST, PUT, OPTIONS', 'access-control-allow-headers': 'content-type, authorization' } })
     }
     if (!originAllowed(req, env)) return json({ error: 'Origen no permitido' }, { status: 403 })
 
     if (url.pathname === '/api/health') return json({ ok: true }, {}, cors)
+
+    // Configuración del perfil: GET devuelve la guardada (null si es un perfil nuevo), PUT la guarda.
+    // Se identifica con el token secreto del jugador (Authorization: Bearer …), igual que en las salas.
+    if (url.pathname === '/api/settings' && (req.method === 'GET' || req.method === 'PUT')) {
+      const token = (req.headers.get('Authorization') ?? '').replace(/^Bearer\s+/i, '')
+      if (token.length < 16 || token.length > 200) return json({ error: 'Falta el token' }, { status: 401 }, cors)
+      const stub = env.PROFILES.get(env.PROFILES.idFromName(await idFromToken(token)))
+      const res = await stub.fetch(new Request('https://profile/settings', { method: req.method, body: req.method === 'PUT' ? await req.text() : undefined }))
+      return json(await res.json(), { status: res.status }, cors)
+    }
 
     // Crear sala: devuelve un código libre. La sala se crea cuando el host se conecta por WebSocket con create=1.
     if (url.pathname === '/api/rooms' && req.method === 'POST') {

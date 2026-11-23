@@ -11,6 +11,7 @@ import { isDevId } from './lib/dev'
 import { lastRoom, requestRoomCode } from './lib/net'
 import { findAvatar, NAME_MAX, validName } from './lib/profile'
 import { play as playSfx } from './lib/sfx'
+import { loadProfileSettings } from './lib/settingsStore'
 import { useAudio } from './lib/useAudio'
 
 type Screen = 'name' | 'menu' | 'play' | 'join' | 'host' | 'devgame' | 'online'
@@ -42,6 +43,9 @@ export default function App() {
   const [hostBusy, setHostBusy] = useState(false)
 
   const { prefs, tracks, setMusicVolume, setSfxVolume, setTrack, startMusic } = useAudio()
+
+  // Perfil: trae la configuración guardada en el servidor (si el perfil es nuevo queda la por defecto)
+  useEffect(() => { void loadProfileSettings() }, [])
 
   // Sonido de clic en cualquier botón habilitado (los botones con sonido propio lo evitan con data-nosound)
   useEffect(() => {
