@@ -126,7 +126,7 @@ body {
 /* Vista 3D (opcional, Configuración › Video): el plano se inclina; las fichas se contra-rotan para verse paradas. */
 .board-wrap.view3d { --tilt: 36deg; perspective: 2200px; perspective-origin: 50% 35%; }
 .board-wrap.view3d .board-plane { transform-style: preserve-3d; transform-origin: 50% 50%; transform: translateY(2%) scale(0.8) rotateX(var(--tilt)); transition: transform 0.5s ease; }
-.board-wrap.view3d { --lean: 52deg; }
+.board-wrap.view3d { --lean: 6deg; }
 /* Ficha "parada": se levanta del plano (--lean) y queda algo inclinada hacia la cámara, con sombra elíptica en el tablero. */
 .board-wrap.view3d .token { transform-origin: 50% 100%; transform: translate(-50%, -100%) rotateX(calc(-1 * var(--lean))); }
 .token-shadow { position: absolute; z-index: 4; aspect-ratio: 1 / 1; border-radius: 50%; background: radial-gradient(closest-side, rgba(0, 0, 0, 0.65), transparent); transform: translate(-50%, -50%) scaleY(0.5); transition: left var(--step-ms, 130ms) linear, top var(--step-ms, 130ms) linear; pointer-events: none; }
