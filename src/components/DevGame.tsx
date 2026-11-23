@@ -373,13 +373,14 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings, online
   /** Clic en los dados: tira (si toca) o acelera la animación en curso (tirada o movimiento de ficha). */
   const diceClick = () => {
     if (rollFaces || moving) {
+      if (!mine) return // acelerar es solo del dueño del turno
       fast.current = true
       online?.sendUi('fast', playingSeq.current ?? game.seq + 1)
       diceSound.current?.stop(150)
       moveSound.current?.stop(100)
     } else if (!busy && mine && !owing && game.phase === 'roll') void rollDice()
   }
-  const diceAction: 'roll' | 'skip' | null = rollFaces || moving ? 'skip' : !busy && mine && !owing && game.phase === 'roll' ? 'roll' : null
+  const diceAction: 'roll' | 'skip' | null = (rollFaces || moving) && mine ? 'skip' : rollFaces || moving ? null : !busy && mine && !owing && game.phase === 'roll' ? 'roll' : null
 
   /** Consultar una propiedad haciendo clic clic en su casilla (en cualquier momento, también fuera de turno). */
   const inspect = (pos: number) => {
@@ -502,7 +503,7 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings, online
         reveal={reveal}
         onCloseReveal={() => {
           closeReveal.current?.()
-          online?.sendUi('closeCard', playingSeq.current ?? game.seq)
+          if (mine) online?.sendUi('closeCard', playingSeq.current ?? game.seq) // los demás solo cierran su propia vista
         }}
         onTileClick={inspect}
         overlay={

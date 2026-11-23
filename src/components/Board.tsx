@@ -89,7 +89,7 @@ export default function Board({ game, seats, shown, colors, drawable = null, onD
           return (
             <div
               key={i}
-              className={`tile side-${sideOf(i)} k-${t.kind}${info ? ' clickable' : ''}${o?.mortgaged ? ' mortgaged' : ''}`}
+              className={`tile side-${sideOf(i)} k-${t.kind}${icon ? ' has-icon' : ''}${info ? ' clickable' : ''}${o?.mortgaged ? ' mortgaged' : ''}`}
               onClick={info && onTileClick ? () => onTileClick(i) : undefined}
               style={{
                 gridRow: row,
@@ -178,14 +178,17 @@ export default function Board({ game, seats, shown, colors, drawable = null, onD
       {overlay}
       {reveal && <CardReveal deck={reveal.deck} text={reveal.text} onClose={onCloseReveal} />}
       {property && !reveal && (
-        <PropertyCard
-          view={property}
-          rules={game.rules}
-          onBuy={property.onBuy}
-          onDecline={property.onDecline}
-          onPay={property.onPay}
-          onClose={property.onClose}
-        />
+        // mientras hay un trueque (o su resultado) la tarjeta se esconde sin cerrarse: si no, tapa el cartel
+        <div style={{ display: 'contents', visibility: overlay ? 'hidden' : 'visible' }}>
+          <PropertyCard
+            view={property}
+            rules={game.rules}
+            onBuy={property.onBuy}
+            onDecline={property.onDecline}
+            onPay={property.onPay}
+            onClose={property.onClose}
+          />
+        </div>
       )}
     </div>
   )

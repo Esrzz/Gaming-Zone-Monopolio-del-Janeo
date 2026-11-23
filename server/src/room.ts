@@ -6,6 +6,7 @@ import {
   applyToGame,
   clockView,
   createRoom,
+  currentPlayer,
   dispatch,
   emptyClock,
   expiredMembers,
@@ -210,7 +211,9 @@ export class GameRoom extends DurableObject<Env> {
         return answer(dispatch(st.room, att.id, msg.action), true)
       case 'ui':
         // gestos de pantalla: se reenvían a los demás (el que lo hizo ya lo aplicó); solo en partida
-        if (st.room.status !== 'playing') return
+        if (st.room.status !== 'playing' || !st.room.game) return
+        // acelerar / cerrar cartas es solo del dueño del turno: los demás no pueden apurar la animación de los otros
+        if (currentPlayer(st.room.game).id !== att.id) return
         return this.broadcast({ t: 'ui', kind: msg.kind, seq: msg.seq, from: att.id }, ws)
       case 'chat': {
         if (now - (this.lastChat.get(att.id) ?? 0) < CHAT_MIN_GAP_MS) return

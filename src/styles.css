@@ -128,13 +128,14 @@ body {
 .board-wrap.view3d .board-plane { transform-style: preserve-3d; transform-origin: 50% 50%; transform: translateY(2%) scale(0.8) rotateX(var(--tilt)); transition: transform 0.5s ease; }
 .board-wrap.view3d { --lean: 6deg; }
 /* Ficha "parada": se levanta del plano (--lean) y queda algo inclinada hacia la cámara, con sombra elíptica en el tablero. */
-.board-wrap.view3d .token { transform-origin: 50% 50%; transform: translate(-50%, -50%) rotateX(calc(-1 * var(--lean))); }
+.board-wrap.view3d .token { transform-origin: 50% 100%; transform: translate(-50%, -50%) translateZ(3px) rotateX(calc(-1 * var(--lean))); }
 .token-shadow { position: absolute; z-index: 4; aspect-ratio: 1 / 1; border-radius: 50%; background: radial-gradient(closest-side, rgba(0, 0, 0, 0.65), transparent); transform: translate(-50%, -50%) scaleY(0.5); transition: left var(--step-ms, 130ms) linear, top var(--step-ms, 130ms) linear; pointer-events: none; }
 .gboard { position: absolute; inset: 0; display: grid; border: 1px solid var(--line); border-radius: 0; overflow: hidden; background: rgba(14, 7, 34, 0.7); backdrop-filter: blur(10px); }
-.tile { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-width: 0; min-height: 0; padding: 4px; border: 1px solid var(--line); text-align: center; overflow: hidden; background: rgba(124, 58, 237, 0.05); }
-.tname { font: 600 clamp(0.52rem, 1.05vw, 0.78rem) / 1.1 var(--display); overflow-wrap: anywhere; }
-.tprice { font-size: clamp(0.5rem, 0.9vw, 0.7rem); color: var(--muted); }
-.ticon { width: clamp(20px, min(2.7vw, 4.2svh), 36px); height: clamp(20px, min(2.7vw, 4.2svh), 36px); border-radius: 6px; object-fit: cover; }
+.tile { container-type: size; position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-width: 0; min-height: 0; padding: 4px; border: 1px solid var(--line); text-align: center; overflow: hidden; background: rgba(124, 58, 237, 0.05); }
+/* los tamaños salen de la casilla (cqmin), no de la ventana: así entran igual en 720p que en 2K */
+.tname { font: 600 clamp(6.5px, 14.5cqmin, 16px) / 1.1 var(--display); overflow-wrap: anywhere; }
+.tprice { font-size: clamp(6px, 12cqmin, 13px); color: var(--muted); }
+.ticon { width: clamp(14px, 40cqmin, 48px); height: clamp(14px, 40cqmin, 48px); border-radius: 6px; object-fit: cover; }
 .strip { position: absolute; }
 .side-bottom .strip { top: 0; left: 0; right: 0; height: 16%; }
 .side-top .strip { bottom: 0; left: 0; right: 0; height: 16%; }
@@ -187,6 +188,13 @@ body {
 .side-top { padding-bottom: calc(16% + 2px); }
 .side-bottom { padding-top: calc(16% + 2px); }
 .tname { hyphens: auto; }
+.side-left .tname, .side-right .tname { font-size: clamp(7px, 19cqh, 16px); }
+.side-left .tprice, .side-right .tprice { font-size: clamp(6px, 15cqh, 13px); }
+/* Costados (izquierda/derecha): las casillas son anchas y bajas, así que ícono a un lado y texto al otro. Tamaños según el alto de la casilla. */
+.side-left.has-icon, .side-right.has-icon { display: grid; grid-template-columns: auto minmax(0, 1fr); grid-template-areas: 'icon name' 'icon price'; align-content: center; justify-items: start; column-gap: 7px; row-gap: 1px; }
+.side-left.has-icon .ticon, .side-right.has-icon .ticon { grid-area: icon; align-self: center; width: clamp(14px, 58cqh, 48px); height: clamp(14px, 58cqh, 48px); }
+.side-left.has-icon .tname, .side-right.has-icon .tname { grid-area: name; align-self: end; text-align: left; font-size: clamp(6.5px, 19cqh, 13px); }
+.side-left.has-icon .tprice, .side-right.has-icon .tprice { grid-area: price; align-self: start; font-size: clamp(6px, 15cqh, 13px); }
 .k-go .tname, .k-jail .tname, .k-parking .tname, .k-gotojail .tname { font-size: clamp(0.62rem, 1.15vw, 0.85rem); }
 
 /* Carta de Suerte / Arca Comunal */
