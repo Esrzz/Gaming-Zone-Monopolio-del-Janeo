@@ -46,7 +46,7 @@ export const GROUP_COLORS: Record<GroupId, string> = {
   darkblue: '#3b5bdb',
 }
 
-export const PLAYER_COLORS = ['#8b5cf6', '#ff4fd8', '#35e8e0', '#3ddc84', '#f5b83d', '#f0524f']
+export { PLAYER_COLORS } from '../engine'
 
 /** Diámetro de las fichas en % del ancho del tablero (el tablero es cuadrado). */
 export const TOKEN_SIZE = 3.8

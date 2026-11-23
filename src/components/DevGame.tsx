@@ -141,7 +141,7 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings, online
     setTradeLeft(TRADE_SECONDS)
   }, [tradeKey])
 
-  const colors = Object.fromEntries(seats.map((s, i) => [s.id, PLAYER_COLORS[i % PLAYER_COLORS.length]]))
+  const colors = Object.fromEntries(seats.map((s, i) => [s.id, s.color ?? PLAYER_COLORS[i % PLAYER_COLORS.length]]))
   const nameOf = (id: string) => seats.find((s) => s.id === id)?.name ?? id
   const me = currentPlayer(game)
   const board = boardOf(game)

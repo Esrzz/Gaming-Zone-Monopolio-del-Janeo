@@ -15,6 +15,7 @@ const UI_KINDS = new Set<string>(['fast', 'closeCard'])
 export type ClientMessage =
   | { t: 'join'; code: string; name: string; avatar?: string | null }
   | { t: 'ready'; ready: boolean }
+  | { t: 'color'; color: string }
   | { t: 'rules'; rules: Record<string, unknown> }
   | { t: 'start' }
   | { t: 'leave' }
@@ -69,6 +70,8 @@ export function parseClientMessage(raw: unknown): ClientMessage | null {
       return { t: 'join', code: m.code.toUpperCase(), name: m.name, avatar: (m.avatar as string | null | undefined) ?? null }
     case 'ready':
       return typeof m.ready === 'boolean' ? { t: 'ready', ready: m.ready } : null
+    case 'color':
+      return isStr(m.color, 12) ? { t: 'color', color: m.color } : null
     case 'rules':
       return isObj(m.rules) ? { t: 'rules', rules: m.rules } : null
     case 'start':

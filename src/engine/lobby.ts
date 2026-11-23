@@ -11,8 +11,15 @@ import type { Action, GameEvent, GameInfo, GameState, PlayerId, Rules } from './
 /** Tiempo que un jugador desconectado tiene para volver antes de perder la partida (como pidió el diseño: 2 minutos) */
 export const RECONNECT_GRACE_MS = 2 * 60 * 1000
 
+/** Colores de las fichas entre los que elige cada jugador en el lobby */
+export const PLAYER_COLORS = ['#8b5cf6', '#ff4fd8', '#35e8e0', '#3ddc84', '#f5b83d', '#f0524f']
+
+const freeColor = (members: { color: string }[]) => PLAYER_COLORS.find((c) => !members.some((m) => m.color === c)) ?? PLAYER_COLORS[0]
+
 export interface Member {
   id: PlayerId
+  /** Color de la ficha (uno de PLAYER_COLORS, distinto para cada jugador) */
+  color: string
   name: string
   avatar: string | null
   ready: boolean
@@ -57,7 +64,7 @@ export function createRoom(code: string, host: { id: PlayerId; name: string; ava
     code,
     hostId: host.id,
     status: 'lobby',
-    members: [{ id: host.id, name: cleanName(host.name) || 'Jugador', avatar: host.avatar ?? null, ready: true, connected: true, disconnectedAt: null }],
+    members: [{ id: host.id, color: PLAYER_COLORS[0], name: cleanName(host.name) || 'Jugador', avatar: host.avatar ?? null, ready: true, connected: true, disconnectedAt: null }],
     rules: sanitizeRules(),
     game: null,
   }
@@ -77,7 +84,7 @@ export function joinRoom(room: Room, who: { id: PlayerId; name: string; avatar?:
   const name = cleanName(who.name)
   if (!name) return fail('Falta el nombre')
   if (r.members.some((m) => m.name.toLowerCase() === name.toLowerCase())) return fail('Ya hay alguien con ese nombre')
-  r.members.push({ id: who.id, name, avatar: who.avatar ?? null, ready: false, connected: true, disconnectedAt: null })
+  r.members.push({ id: who.id, color: freeColor(r.members), name, avatar: who.avatar ?? null, ready: false, connected: true, disconnectedAt: null })
   return ok(r)
 }
 
@@ -100,6 +107,19 @@ export function setReady(room: Room, id: PlayerId, ready: boolean): RoomResult {
   const m = r.members.find((x) => x.id === id)
   if (!m) return fail('No estás en la sala')
   m.ready = ready
+  return ok(r)
+}
+
+/** Cada jugador elige el color de su ficha en el lobby; no puede repetirse. */
+export function setColor(room: Room, id: PlayerId, color: string): RoomResult {
+  if (room.status !== 'lobby') return fail('La partida ya empezó')
+  if (!PLAYER_COLORS.includes(color)) return fail('Color inválido')
+  const m = room.members.find((x) => x.id === id)
+  if (!m) return fail('No estás en la sala')
+  const owner = room.members.find((x) => x.id !== id && x.color === color)
+  if (owner) return fail(`${owner.name} ya eligió ese color`)
+  const r = clone(room)
+  r.members.find((x) => x.id === id)!.color = color
   return ok(r)
 }
 

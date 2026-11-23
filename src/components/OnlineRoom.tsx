@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { whyCannotStart } from '../engine'
+import { DEFAULT_RULES, PLAYER_COLORS, whyCannotStart } from '../engine'
 import type { Action, ClockView, Room, Rules, ServerMessage } from '../engine'
 import { RoomClient, lastRoom } from '../lib/net'
 import type { NetStatus } from '../lib/net'
@@ -96,7 +96,7 @@ export default function OnlineRoom({ code, create, name, avatar, onExit, onSetti
 
   const seats: Seat[] = useMemo(() => {
     if (!room?.game) return []
-    return room.game.players.map((p) => ({ id: p.id, name: p.name, avatar: room.members.find((m) => m.id === p.id)?.avatar ?? null }))
+    return room.game.players.map((p) => ({ id: p.id, name: p.name, avatar: room.members.find((m) => m.id === p.id)?.avatar ?? null, color: room.members.find((m) => m.id === p.id)?.color }))
     // los asientos no cambian durante la partida
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [room?.status, room?.game?.players.length])
@@ -172,7 +172,9 @@ export default function OnlineRoom({ code, create, name, avatar, onExit, onSetti
         <ul className="mlist">
           {room.members.map((m) => (
             <li key={m.id} className={m.connected ? '' : 'off'}>
-              <Avatar name={m.name} src={m.avatar} size={32} />
+              <span className="mring" style={{ ['--pc' as string]: m.color ?? PLAYER_COLORS[0] }}>
+                <Avatar name={m.name} src={m.avatar} size={32} />
+              </span>
               <span className="mname">
                 {m.name}
                 {m.id === room.hostId && <em> · host 👑</em>}
@@ -182,6 +184,32 @@ export default function OnlineRoom({ code, create, name, avatar, onExit, onSetti
             </li>
           ))}
         </ul>
+
+        {me && (
+          <div className="colorpick">
+            <span className="muted">Tu color</span>
+            <div className="swatches" role="radiogroup" aria-label="Color de tu ficha">
+              {PLAYER_COLORS.map((c) => {
+                const owner = room.members.find((m) => m.color === c)
+                const taken = !!owner && owner.id !== you
+                return (
+                  <button
+                    key={c}
+                    type="button"
+                    role="radio"
+                    aria-checked={me.color === c}
+                    aria-label={taken ? `Color en uso por ${owner!.name}` : 'Elegir este color'}
+                    title={taken ? `Lo tiene ${owner!.name}` : undefined}
+                    className={`swatch${me.color === c ? ' on' : ''}`}
+                    style={{ background: c }}
+                    disabled={taken}
+                    onClick={() => send({ t: 'color', color: c })}
+                  />
+                )
+              })}
+            </div>
+          </div>
+        )}
 
         <RulesForm rules={room.rules} editable={isHost} onChange={(rules) => send({ t: 'rules', rules })} />
 
@@ -221,6 +249,7 @@ const RULE_FIELDS: { key: 'turnSeconds' | 'startingCash' | 'goSalary' | 'jailFin
 /** Reglas de la partida: solo el host las cambia (el servidor las valida y las corrige si hace falta). */
 function RulesForm({ rules, editable, onChange }: { rules: Rules; editable: boolean; onChange: (r: Record<string, unknown>) => void }) {
   const [draft, setDraft] = useState<Record<string, string>>({})
+  const isDefault = (Object.keys(DEFAULT_RULES) as (keyof Rules)[]).every((k) => rules[k] === DEFAULT_RULES[k])
   const commit = (key: string) => {
     const raw = draft[key]
     if (raw === undefined) return
@@ -232,8 +261,8 @@ function RulesForm({ rules, editable, onChange }: { rules: Rules; editable: bool
     if (Number.isFinite(n) && n !== (rules as unknown as Record<string, number>)[key]) onChange({ [key]: n })
   }
   return (
-    <details className="rules" open={editable}>
-      <summary>Reglas {editable ? '(las cambiás vos)' : ''}</summary>
+    <details className="rules">
+      <summary>Opciones de la partida {editable ? '(las cambiás vos)' : ''}</summary>
       <div className="rules-grid">
         {RULE_FIELDS.map((f) => (
           <label key={f.key} className="rule">
@@ -253,6 +282,16 @@ function RulesForm({ rules, editable, onChange }: { rules: Rules; editable: bool
           <input type="checkbox" disabled={!editable} checked={rules.freeParkingJackpot} onChange={(e) => onChange({ freeParkingJackpot: e.target.checked })} />
           Impuestos al pozo del Estacionamiento
         </label>
+        {editable && (
+          <button
+            type="button"
+            className="btn ghost sm rules-reset"
+            disabled={isDefault}
+            onClick={() => onChange(Object.fromEntries(Object.entries(DEFAULT_RULES)))}
+          >
+            Restablecer valores por defecto
+          </button>
+        )}
       </div>
     </details>
   )

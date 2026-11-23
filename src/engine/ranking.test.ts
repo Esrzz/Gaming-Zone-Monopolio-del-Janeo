@@ -66,3 +66,20 @@ describe('ranking en vivo', () => {
     expect(createGame([{ id: 'a', name: 'A' }, { id: 'b', name: 'B' }]).games).toEqual(DEFAULT_GAMES)
   })
 })
+
+describe('color de la ficha en el lobby', () => {
+  it('cada jugador recibe un color distinto y puede cambiarlo si está libre', async () => {
+    const { setColor, PLAYER_COLORS } = await import('./index')
+    let room = createRoom('ABCDE', { id: 'h', name: 'Host' })
+    const j = joinRoom(room, { id: 'p2', name: 'Pepe' })
+    if (j.ok) room = j.room
+    expect(room.members[0].color).toBe(PLAYER_COLORS[0])
+    expect(room.members[1].color).toBe(PLAYER_COLORS[1])
+    const taken = setColor(room, 'p2', PLAYER_COLORS[0])
+    expect(taken.ok).toBe(false)
+    const free = setColor(room, 'p2', PLAYER_COLORS[4])
+    expect(free.ok && free.room.members[1].color).toBe(PLAYER_COLORS[4])
+    expect(setColor(room, 'p2', '#123456').ok).toBe(false)
+    expect(setColor(room, 'nadie', PLAYER_COLORS[3]).ok).toBe(false)
+  })
+})

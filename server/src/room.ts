@@ -19,6 +19,7 @@ import {
   reconnect,
   sanitizeRules,
   disconnect,
+  setColor,
   setReady,
   setRules,
   startGame,
@@ -190,6 +191,8 @@ export class GameRoom extends DurableObject<Env> {
     switch (msg.t) {
       case 'ready':
         return answer(setReady(st.room, att.id, msg.ready))
+      case 'color':
+        return answer(setColor(st.room, att.id, msg.color))
       case 'rules':
         return answer(setRules(st.room, att.id, msg.rules as Partial<Rules>))
       case 'start': {

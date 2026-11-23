@@ -15,6 +15,8 @@ export interface Seat {
   id: string
   name: string
   avatar: string | null
+  /** Color de la ficha elegido en el lobby (sin él, uno por orden de asiento) */
+  color?: string
 }
 
 interface Props {
