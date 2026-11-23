@@ -17,6 +17,7 @@ import {
   whyCannotStart,
 } from './lobby'
 import type { Room } from './lobby'
+import { currentPlayer } from './engine'
 import { parseClientMessage, sanitizeChat } from './protocol'
 
 const must = (r: { ok: boolean; room?: Room; error?: string }): Room => {
@@ -112,17 +113,28 @@ describe('sala: lobby', () => {
 })
 
 describe('sala: partida', () => {
-  const playing = () => must(startGame(lobby(3), 'h', 11))
+  /** Al empezar hay una tirada para definir el orden; acá se resuelve para llegar al primer turno. */
+  const finishOrder = (room: Room): Room => {
+    let r = room
+    while (r.game?.phase === 'order') {
+      const id = currentPlayer(r.game).id
+      r = must(dispatch(r, id, { type: 'orderRoll', player: id }))
+    }
+    return r
+  }
+  const playing = () => finishOrder(must(startGame(lobby(3), 'h', 11)))
 
   it('solo se juega por uno mismo, sin dados propios y sin acciones del servidor', () => {
     const room = playing()
-    expect(dispatch(room, 'p1', { type: 'roll', player: 'h' }).ok).toBe(false) // jugar por otro
-    expect(dispatch(room, 'h', { type: 'roll', player: 'h', dice: [6, 6] }).ok).toBe(false) // dados propios
-    expect(dispatch(room, 'h', { type: 'abandon', player: 'h' }).ok).toBe(false) // acción del servidor
-    const ok = dispatch(room, 'h', { type: 'roll', player: 'h' })
+    const first = currentPlayer(room.game!).id
+    const other = room.members.find((m) => m.id !== first)!.id
+    expect(dispatch(room, other, { type: 'roll', player: first }).ok).toBe(false) // jugar por otro
+    expect(dispatch(room, first, { type: 'roll', player: first, dice: [6, 6] }).ok).toBe(false) // dados propios
+    expect(dispatch(room, first, { type: 'abandon', player: first }).ok).toBe(false) // acción del servidor
+    const ok = dispatch(room, first, { type: 'roll', player: first })
     expect(ok.ok).toBe(true)
     if (ok.ok) {
-      expect(ok.room.game?.seq).toBe(1)
+      expect(ok.room.game?.seq).toBe(room.game!.seq + 1)
       expect(ok.events.some((e) => e.type === 'rolled')).toBe(true)
     }
   })

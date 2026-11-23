@@ -154,6 +154,7 @@ export function startGame(room: Room, requester: PlayerId, seed?: number): RoomR
     r.rules,
     seed ?? Math.random,
     r.games,
+    { order: true },
   )
   r.status = 'playing'
   return ok(r)

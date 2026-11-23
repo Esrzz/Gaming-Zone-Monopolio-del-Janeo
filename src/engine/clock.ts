@@ -14,6 +14,9 @@ export interface ClockConfig {
   tradeMs: number
 }
 
+/** Tiempo para tirar en la fase de orden de salida (nadie debería trabar el arranque 4 minutos) */
+export const ORDER_ROLL_MS = 20_000
+
 export const DEFAULT_CLOCK: ClockConfig = { turnMs: 240_000, tradeMs: 60_000 }
 
 export interface Clock {
@@ -26,6 +29,8 @@ export interface Clock {
   /** Hora en que vence la respuesta al intercambio abierto */
   tradeEndsAt: number | null
   tradeTo: PlayerId | null
+  /** El reloj corrió durante la fase de orden de salida (al cambiar de fase se reinicia) */
+  inOrder?: boolean
 }
 
 export const emptyClock = (): Clock => ({ player: null, turnEndsAt: null, turnPausedMs: null, tradeEndsAt: null, tradeTo: null })
@@ -35,8 +40,10 @@ export function advanceClock(prev: Clock, game: GameState | null, now: number, c
   if (!game || game.phase === 'over') return emptyClock()
   const c = { ...prev }
   const who = currentPlayer(game).id
-  if (c.player !== who) {
-    return { player: who, turnEndsAt: now + cfg.turnMs, turnPausedMs: null, tradeEndsAt: game.trade ? now + cfg.tradeMs : null, tradeTo: game.trade?.to ?? null }
+  const inOrder = game.phase === 'order'
+  if (c.player !== who || !!c.inOrder !== inOrder) {
+    const turnMs = inOrder ? Math.min(cfg.turnMs, ORDER_ROLL_MS) : cfg.turnMs
+    return { player: who, inOrder, turnEndsAt: now + turnMs, turnPausedMs: null, tradeEndsAt: game.trade ? now + cfg.tradeMs : null, tradeTo: game.trade?.to ?? null }
   }
   if (game.trade) {
     if (c.tradeEndsAt === null || c.tradeTo !== game.trade.to) {

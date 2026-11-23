@@ -19,6 +19,12 @@ export function describeEvent(e: GameEvent, name: (id: string) => string, board:
   switch (e.type) {
     case 'rolled':
       return `${name(e.player)} sacó ${e.dice[0]} y ${e.dice[1]}`
+    case 'orderRolled':
+      return `${name(e.player)} sacó ${e.dice[0]} y ${e.dice[1]} (${e.dice[0] + e.dice[1]})${e.round > 1 ? ' en el desempate' : ' para el orden de salida'}`
+    case 'orderTie':
+      return `Empate entre ${e.players.map(name).join(', ')}: vuelven a tirar`
+    case 'orderSet':
+      return `Orden de salida: ${e.order.map((id, i) => `${i + 1}° ${name(id)}`).join(' · ')}`
     case 'moved':
       return `${name(e.player)} avanzó a ${board[e.to].name}${e.passedGo ? ' y cobró la salida' : ''}`
     case 'bought':

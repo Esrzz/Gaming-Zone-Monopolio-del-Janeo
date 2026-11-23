@@ -38,7 +38,7 @@ export type ServerMessage =
   | { t: 'pong' }
 
 const ACTION_TYPES = new Set<string>([
-  'roll', 'buy', 'decline', 'endTurn', 'payJailFine', 'useJailCard', 'bankrupt', 'drawCard',
+  'roll', 'orderRoll', 'buy', 'decline', 'endTurn', 'payJailFine', 'useJailCard', 'bankrupt', 'drawCard',
   'proposeTrade', 'acceptTrade', 'rejectTrade', 'cancelTrade',
   'build', 'sellHouse', 'mortgage', 'unmortgage',
 ])

@@ -71,7 +71,23 @@ export interface Ownership {
  * card: cayó en Suerte o Arca y debe robar carta.
  * end: puede terminar el turno. over: partida terminada.
  */
-export type Phase = 'roll' | 'buy' | 'card' | 'end' | 'over'
+/** `order`: antes del primer turno, todos tiran los dados para definir quién empieza (ver `OrderState`). */
+export type Phase = 'order' | 'roll' | 'buy' | 'card' | 'end' | 'over'
+
+/**
+ * Tirada inicial para definir el orden de los turnos. Tiran todos en el orden en que entraron al lobby; el que saca
+ * más va primero, y los que empatan vuelven a tirar entre ellos hasta desempatar (también para los lugares de abajo).
+ */
+export interface OrderState {
+  /** Grupos en orden de ranking. Los de un solo jugador ya tienen su lugar; los de más de uno se están desempatando. */
+  ranks: PlayerId[][]
+  /** Quiénes faltan por tirar en esta ronda, en orden de llegada al lobby (el primero es el que tira ahora) */
+  queue: PlayerId[]
+  /** Lo que sacó cada uno en esta ronda */
+  rolls: Record<PlayerId, [number, number]>
+  /** Número de ronda (la 1 es la de todos; las siguientes son desempates) */
+  round: number
+}
 
 /** Todo el estado es JSON plano: se puede guardar y mandar por red tal cual. */
 /** Un juego del ranking del server (ocupa una calle). Sale de las stats del worker al crear la sala. */
@@ -95,6 +111,8 @@ export interface GameState {
   lastDice: [number, number] | null
   pot: number
   winner: PlayerId | null
+  /** Solo mientras se define el orden de salida (fase `order`) */
+  order?: OrderState | null
   /** Carta que está esperando ser robada (fase 'card') */
   pendingCard: { deck: 'chance' | 'chest'; cardId: string } | null
   /**
@@ -164,6 +182,8 @@ export interface TradeOffer {
 export type Action =
   /** Sin `dice` el motor tira (así lo hace el servidor); con `dice` se usan esos (modo de prueba) */
   | { type: 'roll'; player: PlayerId; dice?: [number, number] }
+  /** Tirada inicial para el orden de los turnos (con `dice` solo en el modo de prueba, igual que `roll`) */
+  | { type: 'orderRoll'; player: PlayerId; dice?: [number, number] }
   | { type: 'buy'; player: PlayerId }
   | { type: 'decline'; player: PlayerId }
   | { type: 'endTurn'; player: PlayerId }
@@ -186,6 +206,11 @@ export type Action =
 /** Eventos que la interfaz usa para animar (movimiento de fichas, avisos, chat de sistema). */
 export type GameEvent =
   | { type: 'rolled'; player: PlayerId; dice: [number, number] }
+  | { type: 'orderRolled'; player: PlayerId; dice: [number, number]; round: number }
+  /** Empataron: vuelven a tirar solo ellos */
+  | { type: 'orderTie'; players: PlayerId[]; round: number }
+  /** Orden de juego definido (el primero arranca) */
+  | { type: 'orderSet'; order: PlayerId[] }
   | { type: 'moved'; player: PlayerId; from: number; to: number; steps: number; passedGo: boolean }
   | { type: 'bought'; player: PlayerId; tile: number; price: number }
   | { type: 'declined'; player: PlayerId; tile: number }

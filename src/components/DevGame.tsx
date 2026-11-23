@@ -200,7 +200,7 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings, online
     // gestos de otros jugadores que llegaron antes de empezar esta animación
     if (pendingUi.current.some((u) => u.ui === 'fast' && u.seq === state.seq)) fast.current = true
     setBusy(true)
-    if (online && events.some((e) => e.type === 'rolled')) {
+    if (online && events.some((e) => e.type === 'rolled' || e.type === 'orderRolled')) {
       // la tirada de otro jugador (o la propia, ya girando): los dados giran hasta que termina el sonido
       if (!spin.current) startSpin()
       await spin.current!.ended
@@ -270,7 +270,7 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings, online
       }
       // El registro va al ritmo de la animación (así la carta no se "spoilea")
       const line =
-        auto && e.type === 'rolled' ? `${nameOf(e.player)} sacó ${e.dice[0]} y ${e.dice[1]} (tirada automática)` : describeEvent(e, nameOf, board)
+        auto && (e.type === 'rolled' || e.type === 'orderRolled') ? `${nameOf(e.player)} sacó ${e.dice[0]} y ${e.dice[1]} (tirada automática)` : describeEvent(e, nameOf, board)
       if (line) setLog((l) => [...l, line])
     }
     apply()
@@ -358,7 +358,7 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings, online
     if (online) {
       // los dados giran mientras el servidor tira; el resultado llega por `subscribe`
       startSpin()
-      if (!online.send({ type: 'roll', player: me.id })) {
+      if (!online.send({ type: game.phase === 'order' ? 'orderRoll' : 'roll', player: me.id })) {
         diceSound.current?.stop(100)
         stopSpin()
         setBusy(false)
@@ -374,6 +374,8 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings, online
     await dispatch({ type: 'roll', player: me.id, dice: [a, b] }, true)
   }
 
+  const canRoll = game.phase === 'roll' || game.phase === 'order'
+
   /** Clic en los dados: tira (si toca) o acelera la animación en curso (tirada o movimiento de ficha). */
   const diceClick = () => {
     if (rollFaces || moving) {
@@ -382,9 +384,9 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings, online
       online?.sendUi('fast', playingSeq.current ?? game.seq + 1)
       diceSound.current?.stop(150)
       moveSound.current?.stop(100)
-    } else if (!busy && mine && !owing && game.phase === 'roll') void rollDice()
+    } else if (!busy && mine && !owing && canRoll) void rollDice()
   }
-  const diceAction: 'roll' | 'skip' | null = (rollFaces || moving) && mine ? 'skip' : rollFaces || moving ? null : !busy && mine && !owing && game.phase === 'roll' ? 'roll' : null
+  const diceAction: 'roll' | 'skip' | null = (rollFaces || moving) && mine ? 'skip' : rollFaces || moving ? null : !busy && mine && !owing && canRoll ? 'roll' : null
 
   /** Atajos de teclado (Configuración › Jugabilidad): hacen lo mismo que los botones y respetan las mismas condiciones. */
   const canAnswerOffer = !!game.trade && game.phase !== 'over' && !busy && !tradeFx && (!online || game.trade.to === online.you)
@@ -395,7 +397,7 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings, online
       if (reveal) { closeReveal.current?.(); online?.sendUi('closeCard', playingSeq.current ?? game.seq); return true }
     },
     roll: () => {
-      if (!busy && mine && !owing && game.phase === 'roll' && !rollFaces && !moving) { void rollDice(); return true }
+      if (!busy && mine && !owing && canRoll && !rollFaces && !moving) { void rollDice(); return true }
     },
     accept: () => {
       if (!canAnswerOffer) return
@@ -429,7 +431,7 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings, online
   const autoStep = async () => {
     const act = timeoutAction(live.current.game)
     if (!act) return
-    if (act.type === 'roll') await live.current.rollDice()
+    if (act.type === 'roll' || act.type === 'orderRoll') await live.current.rollDice()
     else await live.current.dispatch(act)
   }
 
@@ -641,9 +643,25 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings, online
                 </span>
               </div>
               <p className="muted">
-                Estás en {tile.name}
+                {game.phase === 'order' ? 'Definiendo el orden de salida: tirá los dados' : `Estás en ${tile.name}`}
                 {game.phase === 'roll' && game.rollAgain ? ' · sacó dobles, tira de nuevo' : ''}
               </p>
+
+              {game.phase === 'order' && game.order && (
+                <ul className="order-rolls">
+                  {game.order.round > 1 && <li className="muted">Desempate (ronda {game.order.round})</li>}
+                  {game.players
+                    .filter((p) => game.order!.rolls[p.id] || game.order!.queue.includes(p.id))
+                    .map((p) => {
+                      const r = game.order!.rolls[p.id]
+                      return (
+                        <li key={p.id}>
+                          {p.name}: {r ? `${r[0]} + ${r[1]} = ${r[0] + r[1]}` : p.id === me.id ? 'tirando…' : 'espera'}
+                        </li>
+                      )
+                    })}
+                </ul>
+              )}
 
               {mine && owing && debt && (
                 <div className="debt-box">
@@ -657,7 +675,7 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings, online
                 </div>
               )}
 
-              {mine && !owing && game.phase === 'roll' && (
+              {mine && !owing && canRoll && (
                 <div className="stack">
                   <button className="btn primary" disabled={locked} onClick={rollDice}>
                     Tirar dados{online ? '' : ` por ${me.name}`}

@@ -64,6 +64,7 @@ export function createGame(
   rules: Partial<Rules> = {},
   random: number | (() => number) = Math.random,
   games?: GameInfo[],
+  opts: { order?: boolean } = {},
 ): GameState {
   if (players.length < MIN_PLAYERS || players.length > MAX_PLAYERS) {
     throw new Error(`La partida necesita entre ${MIN_PLAYERS} y ${MAX_PLAYERS} jugadores`)
@@ -86,7 +87,8 @@ export function createGame(
     })),
     owned: {},
     current: 0,
-    phase: 'roll',
+    phase: opts.order ? 'order' : 'roll',
+    order: opts.order ? { ranks: [players.map((p) => p.id)], queue: players.map((p) => p.id), rolls: {}, round: 1 } : null,
     doubles: 0,
     rollAgain: false,
     lastDice: null,
@@ -205,6 +207,9 @@ export function applyAction(prev: GameState, action: Action, opts: ApplyOptions 
     return done()
   }
 
+  // Mientras se define el orden de salida no se puede hacer nada más que tirar (ni intercambiar ni construir)
+  if (s.phase === 'order' && action.type !== 'orderRoll') return fail('Todavía se está definiendo el orden de salida')
+
   // Los intercambios se responden en cualquier momento; proponerlos solo se puede en tu turno (ver trade.ts).
   if (isTradeAction(action)) {
     const error = applyTradeAction(s, ev, action)
@@ -225,6 +230,20 @@ export function applyAction(prev: GameState, action: Action, opts: ApplyOptions 
   if (currentPlayer(s).id !== action.player) return fail('No es tu turno')
 
   switch (action.type) {
+    case 'orderRoll': {
+      const o = s.order
+      if (s.phase !== 'order' || !o) return fail('Ahora no se tira para el orden de salida')
+      if (action.dice && opts.clientDice === false) return fail('Los dados los tira el servidor')
+      const [a, b] = action.dice ?? [Math.floor(rngNext(s) * 6) + 1, Math.floor(rngNext(s) * 6) + 1]
+      if (![a, b].every((d) => Number.isInteger(d) && d >= 1 && d <= 6)) return fail('Dados inválidos')
+      o.rolls[me.id] = [a, b]
+      o.queue.shift()
+      s.lastDice = [a, b]
+      ev.push({ type: 'orderRolled', player: me.id, dice: [a, b], round: o.round })
+      advanceOrder(s, ev)
+      break
+    }
+
     case 'roll': {
       if (s.phase !== 'roll') return fail('Ahora no se puede tirar')
       if (action.dice && opts.clientDice === false) return fail('Los dados los tira el servidor')
@@ -607,9 +626,66 @@ function goBankrupt(s: GameState, ev: GameEvent[], p: PlayerState, creditor: Pla
     s.winner = alive[0].id
     s.phase = 'over'
     ev.push({ type: 'won', player: alive[0].id })
+  } else if (s.phase === 'order') {
+    dropFromOrder(s, ev, p.id)
   } else if (wasCurrent) {
     nextTurn(s, ev)
   }
+}
+
+/** El que tira ahora en la fase `order` es el primero de la cola. */
+function pointAtQueueHead(s: GameState) {
+  const head = s.order?.queue[0]
+  if (head) s.current = Math.max(0, s.players.findIndex((p) => p.id === head))
+}
+
+/**
+ * Terminó la cola de una ronda: se separan los jugadores por lo que sacaron (mayor suma primero). Si quedan grupos
+ * empatados, tiran de nuevo solo ellos; si no, queda definido el orden y empieza el primer turno.
+ */
+function advanceOrder(s: GameState, ev: GameEvent[]) {
+  const o = s.order
+  if (!o) return
+  if (o.queue.length > 0) return pointAtQueueHead(s)
+
+  const idx = o.ranks.findIndex((g) => g.length > 0 && g.every((id) => id in o.rolls))
+  if (idx >= 0) {
+    const sum = (id: string) => o.rolls[id][0] + o.rolls[id][1]
+    const sums = [...new Set(o.ranks[idx].map(sum))].sort((x, y) => y - x)
+    // dentro de cada grupo se mantiene el orden de llegada al lobby
+    o.ranks.splice(idx, 1, ...sums.map((v) => o.ranks[idx].filter((id) => sum(id) === v)))
+  }
+  o.ranks = o.ranks.filter((g) => g.length > 0)
+
+  const tied = o.ranks.find((g) => g.length > 1)
+  if (tied) {
+    o.round += 1
+    o.rolls = {}
+    o.queue = s.players.map((p) => p.id).filter((id) => tied.includes(id))
+    ev.push({ type: 'orderTie', players: [...o.queue], round: o.round })
+    return pointAtQueueHead(s)
+  }
+
+  const order = o.ranks.flat()
+  const byId = new Map(s.players.map((p) => [p.id, p]))
+  s.players = [...order.map((id) => byId.get(id)!), ...s.players.filter((p) => !order.includes(p.id))]
+  s.order = null
+  s.phase = 'roll'
+  s.current = 0
+  s.doubles = 0
+  s.rollAgain = false
+  ev.push({ type: 'orderSet', order })
+  ev.push({ type: 'turn', player: currentPlayer(s).id })
+}
+
+/** Alguien se fue (o quebró) mientras se definía el orden: sale de la cola y de los grupos. */
+function dropFromOrder(s: GameState, ev: GameEvent[], id: PlayerId) {
+  const o = s.order
+  if (!o) return
+  o.queue = o.queue.filter((x) => x !== id)
+  o.ranks = o.ranks.map((g) => g.filter((x) => x !== id)).filter((g) => g.length > 0)
+  delete o.rolls[id]
+  advanceOrder(s, ev)
 }
 
 function nextTurn(s: GameState, ev: GameEvent[]) {
@@ -631,6 +707,7 @@ export function timeoutAction(s: GameState): Action | null {
   if (s.phase === 'over') return null
   if (s.trade) return { type: 'rejectTrade', player: s.trade.to }
   const p = currentPlayer(s)
+  if (s.phase === 'order') return { type: 'orderRoll', player: p.id }
   if (s.debts.some((d) => d.from === p.id)) return { type: 'bankrupt', player: p.id }
   switch (s.phase) {
     case 'roll':
