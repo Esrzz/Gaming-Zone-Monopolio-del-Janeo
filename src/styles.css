@@ -134,7 +134,7 @@ body {
 .tile { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-width: 0; min-height: 0; padding: 4px; border: 1px solid var(--line); text-align: center; overflow: hidden; background: rgba(124, 58, 237, 0.05); }
 .tname { font: 600 clamp(0.52rem, 1.05vw, 0.78rem) / 1.1 var(--display); overflow-wrap: anywhere; }
 .tprice { font-size: clamp(0.5rem, 0.9vw, 0.7rem); color: var(--muted); }
-.ticon { width: clamp(16px, 2.3vw, 30px); height: clamp(16px, 2.3vw, 30px); border-radius: 6px; object-fit: cover; }
+.ticon { width: clamp(20px, min(2.7vw, 4.2svh), 36px); height: clamp(20px, min(2.7vw, 4.2svh), 36px); border-radius: 6px; object-fit: cover; }
 .strip { position: absolute; }
 .side-bottom .strip { top: 0; left: 0; right: 0; height: 16%; }
 .side-top .strip { bottom: 0; left: 0; right: 0; height: 16%; }
