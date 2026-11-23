@@ -91,7 +91,7 @@ export default function Board({ game, seats, shown, colors, drawable = null, onD
           return (
             <div
               key={i}
-              className={`tile side-${sideOf(i)} k-${t.kind}${icon ? ' has-icon' : ''}${info ? ' clickable' : ''}${o?.mortgaged ? ' mortgaged' : ''}`}
+              className={`tile side-${sideOf(i)} k-${t.kind}${icon ? ' has-icon' : ''}${info ? ' clickable' : ''}${o?.mortgaged ? ' mortgaged' : ''}${o && o.houses > 0 ? ' built' : ''}`}
               onClick={info && onTileClick ? () => onTileClick(i) : undefined}
               style={{
                 gridRow: row,
@@ -105,7 +105,7 @@ export default function Board({ game, seats, shown, colors, drawable = null, onD
               <span className="tname">{t.name}</span>
               <span className="tprice">{label(t)}</span>
               {o && o.houses > 0 && (
-                <span className="bld" aria-label={o.houses === 5 ? 'Hotel' : `${o.houses} casas`}>
+                <span className={`bld${o.houses === 5 ? ' hotel-band' : ''}`} aria-label={o.houses === 5 ? 'Hotel' : `${o.houses} casas`}>
                   {o.houses === 5 ? <HotelIcon size={22} /> : Array.from({ length: o.houses }, (_, k) => <HouseIcon key={k} size={16} />)}
                 </span>
               )}

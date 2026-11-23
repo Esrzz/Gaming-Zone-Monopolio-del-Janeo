@@ -139,10 +139,10 @@ body {
 .tprice { font-size: clamp(6px, 12cqmin, 13px); color: var(--muted); }
 .ticon { width: clamp(14px, 40cqmin, 48px); height: clamp(14px, 40cqmin, 48px); border-radius: 6px; object-fit: cover; }
 .strip { position: absolute; }
-.side-bottom .strip { top: 0; left: 0; right: 0; height: 16%; }
-.side-top .strip { bottom: 0; left: 0; right: 0; height: 16%; }
-.side-left .strip { right: 0; top: 0; bottom: 0; width: 16%; }
-.side-right .strip { left: 0; top: 0; bottom: 0; width: 16%; }
+.side-bottom .strip { top: 0; left: 0; right: 0; height: 20%; }
+.side-top .strip { bottom: 0; left: 0; right: 0; height: 20%; }
+.side-left .strip { right: 0; top: 0; bottom: 0; width: 20%; }
+.side-right .strip { left: 0; top: 0; bottom: 0; width: 20%; }
 .k-go, .k-jail, .k-parking, .k-gotojail { background: rgba(124, 58, 237, 0.16); }
 .k-chance .tname { color: var(--pink); }
 .k-chest .tname { color: var(--cyan); }
@@ -388,11 +388,27 @@ body {
 .mg-note { margin: 12px 0 0; font-size: 0.8rem; }
 
 /* ---------- Casas, hoteles e hipotecas en el tablero ---------- */
-.bld { position: absolute; z-index: 2; display: flex; gap: 2px; pointer-events: none; }
-.side-bottom .bld { top: 2px; left: 0; right: 0; justify-content: center; }
-.side-top .bld { bottom: 2px; left: 0; right: 0; justify-content: center; }
-.side-left .bld { right: 2px; top: 0; bottom: 0; flex-direction: column; justify-content: center; }
-.side-right .bld { left: 2px; top: 0; bottom: 0; flex-direction: column; justify-content: center; }
+/* Los edificios van sobre la franja de color (como en el Monopoly de verdad). En las casillas construidas la franja se
+   ensancha (--b) y el contenido se corre para no taparse; fondo oscuro para que resalten. Tamaños en unidades cq. */
+.tile.built { --b: 23%; gap: 1px; }
+.side-bottom.built { padding-top: var(--b); }
+.side-top.built { padding-bottom: var(--b); }
+.side-left.built { padding-right: var(--b); }
+.side-right.built { padding-left: var(--b); }
+.side-bottom.built .strip, .side-top.built .strip { height: var(--b); }
+.side-left.built .strip, .side-right.built .strip { width: var(--b); }
+.tile.built .ticon { width: clamp(12px, 44cqmin, 44px); height: clamp(12px, 44cqmin, 44px); }
+.bld { position: absolute; z-index: 2; display: flex; align-items: center; justify-content: center; gap: 1.5cqmin; pointer-events: none; background: rgba(8, 4, 22, 0.72); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.18); }
+.side-bottom .bld { top: 0; left: 0; right: 0; height: var(--b); }
+.side-top .bld { bottom: 0; left: 0; right: 0; height: var(--b); }
+.side-left .bld { right: 0; top: 0; bottom: 0; width: var(--b); flex-wrap: wrap; align-content: center; gap: 1cqmin; }
+.side-right .bld { left: 0; top: 0; bottom: 0; width: var(--b); flex-wrap: wrap; align-content: center; gap: 1cqmin; }
+.bld .bico { filter: drop-shadow(0 0 2px rgba(0, 0, 0, 0.9)); }
+.side-bottom .bld .bico, .side-top .bld .bico { width: min(24cqw, 34cqh); height: min(24cqw, 34cqh); }
+.side-left .bld .bico, .side-right .bld .bico { width: min(15cqw, 40cqh); height: min(15cqw, 40cqh); }
+.side-bottom .bld .bico.hotel, .side-top .bld .bico.hotel { width: min(36cqw, 40cqh); height: min(36cqw, 40cqh); }
+.side-left .bld .bico.hotel, .side-right .bld .bico.hotel { width: min(24cqw, 70cqh); height: min(24cqw, 70cqh); }
+.bld.hotel-band { background: rgba(120, 12, 12, 0.78); box-shadow: inset 0 0 0 1px rgba(255, 190, 120, 0.55), 0 0 10px rgba(255, 90, 60, 0.55); }
 .tile.mortgaged { background: repeating-linear-gradient(135deg, rgba(120, 120, 140, 0.25) 0 6px, rgba(40, 30, 70, 0.3) 6px 12px); }
 .tile.mortgaged .tname, .tile.mortgaged .tprice, .tile.mortgaged .ticon { opacity: 0.45; }
 .tile .mtag { position: absolute; left: 0; right: 0; bottom: 3px; font: 700 clamp(0.42rem, calc(0.7 * var(--vw)), 0.58rem) var(--display); letter-spacing: 0.1em; text-transform: uppercase; color: #ffb4b4; }
