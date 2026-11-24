@@ -310,6 +310,8 @@ export function applyAction(prev: GameState, action: Action, opts: ApplyOptions 
     case 'decline': {
       if (s.phase !== 'buy') return fail('No hay nada para rechazar')
       ev.push({ type: 'declined', player: me.id, tile: me.position })
+      // Un intercambio abierto no puede convivir con la subasta (nadie lo podría responder): se cierra
+      if (s.trade) cancelTradeOf(s, ev, s.trade.from)
       // Subasta obligatoria: la propiedad se la queda el que más ofrezca (la fase sigue en 'buy' hasta que cierre)
       s.auction = { tile: me.position, bid: 0, leader: null, passed: [] }
       ev.push({ type: 'auctionStarted', tile: me.position })
@@ -353,7 +355,8 @@ export function applyAction(prev: GameState, action: Action, opts: ApplyOptions 
       // La carta usada va al descarte (la "salí libre" se queda con quien la tiene hasta que la use)
       if (card.effect.kind !== 'getOutOfJail') s.decks[deck].discard.push(card.id)
 
-      if (!me.bankrupt && (s.phase as Phase) !== 'buy' && (s.phase as Phase) !== 'over') settle(s)
+      // Si la carta te llevó a otra casilla de carta, esa queda pendiente (fase 'card'): no hay que pasar de fase
+      if (!me.bankrupt && !s.pendingCard && (s.phase as Phase) !== 'buy' && (s.phase as Phase) !== 'over') settle(s)
       break
     }
   }
