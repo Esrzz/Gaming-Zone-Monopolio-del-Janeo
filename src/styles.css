@@ -187,8 +187,8 @@ body {
 .link:disabled { opacity: 0.4; cursor: not-allowed; }
 
 /* Ajustes: texto de las casillas laterales y fichas */
-.side-left { padding-right: calc(16% + 4px); }
-.side-right { padding-left: calc(16% + 4px); }
+.side-left { padding-right: calc(20% + 7px); }
+.side-right { padding-left: calc(20% + 7px); }
 .side-top { padding-bottom: calc(16% + 2px); }
 .side-bottom { padding-top: calc(16% + 2px); }
 .tname { hyphens: auto; }
@@ -393,8 +393,8 @@ body {
 .tile.built { --b: 23%; gap: 1px; }
 .side-bottom.built { padding-top: var(--b); }
 .side-top.built { padding-bottom: var(--b); }
-.side-left.built { padding-right: var(--b); }
-.side-right.built { padding-left: var(--b); }
+.side-left.built { padding-right: calc(var(--b) + 7px); }
+.side-right.built { padding-left: calc(var(--b) + 7px); }
 .side-bottom.built .strip, .side-top.built .strip { height: var(--b); }
 .side-left.built .strip, .side-right.built .strip { width: var(--b); }
 .tile.built .ticon { width: clamp(12px, 44cqmin, 44px); height: clamp(12px, 44cqmin, 44px); }
@@ -541,8 +541,16 @@ body {
 .auc-who { display: flex; align-items: center; gap: 8px; font-size: 0.82rem; }
 
 /* ── Aviso de cambio de turno ── */
-.turn-banner { display: grid; justify-items: center; gap: 2px; padding: 20px 52px; border-radius: 20px; border: 2px solid var(--pc, #c4b5fd); background: rgb(14, 7, 36); box-shadow: 0 0 34px -4px var(--pc, #8b5cf6); animation: turnbanner 1.7s ease both; }
-.turn-banner small { font-size: 0.78rem; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.75; }
-.turn-banner strong { font: 800 clamp(1.4rem, 3.2vw, 2.4rem) var(--display); color: var(--pc, #fff); text-shadow: 0 0 18px var(--pc, transparent); }
+.turn-banner { display: grid; justify-items: center; gap: 4px; padding: clamp(18px, 3.2vw, 38px) clamp(44px, 9vw, 120px); border-radius: 26px; border: 3px solid var(--pc, #c4b5fd); background: rgb(14, 7, 36); box-shadow: 0 0 0 6px rgba(14, 7, 36, 0.55), 0 0 70px -2px var(--pc, #8b5cf6), 0 18px 60px rgba(0, 0, 0, 0.6); animation: turnbanner 1.7s ease both; }
+.turn-banner small { font-size: clamp(0.95rem, 1.7vw, 1.5rem); letter-spacing: 0.14em; text-transform: uppercase; opacity: 0.85; }
+.turn-banner strong { font: 800 clamp(2.6rem, 6.4vw, 5.6rem)/1.05 var(--display); color: var(--pc, #fff); text-shadow: 0 0 26px var(--pc, transparent), 0 3px 0 rgba(0, 0, 0, 0.5); }
 @keyframes turnbanner { 0% { opacity: 0; transform: scale(0.85) translateY(10px); } 14% { opacity: 1; transform: scale(1.04); } 22% { transform: scale(1); } 80% { opacity: 1; } 100% { opacity: 0; transform: scale(1) translateY(-6px); } }
 @media (prefers-reduced-motion: reduce) { .turn-banner { animation: none; } }
+
+/* Vista 3D: la fila de arriba queda lejos y aplastada, así que el texto se agranda y se estira un poco para que se lea */
+.board-wrap.view3d .side-top .tname { font-size: clamp(8.5px, 15.5cqmin, 18px); line-height: 1.05; font-weight: 700; text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9); transform: scaleY(1.12); }
+.board-wrap.view3d .side-top .ticon { width: clamp(12px, 32cqmin, 32px); height: clamp(12px, 32cqmin, 32px); }
+.board-wrap.view3d .side-top .tprice { font-size: clamp(8px, 13cqmin, 15px); color: #cfc6ee; text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9); transform: scaleY(1.12); }
+.board-wrap.view3d .side-top.k-chance .tname, .board-wrap.view3d .side-top.k-chest .tname { font-size: clamp(11px, 27cqmin, 28px); }
+.board-wrap.view3d .k-go .tname, .board-wrap.view3d .k-jail .tname, .board-wrap.view3d .k-parking .tname, .board-wrap.view3d .k-gotojail .tname { transform: scaleY(1.12); }
+.board-wrap.view3d .side-left .tname, .board-wrap.view3d .side-right .tname { font-size: clamp(7.5px, 20.5cqh, 17px); text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9); }
