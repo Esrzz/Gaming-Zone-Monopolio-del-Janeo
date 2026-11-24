@@ -244,7 +244,8 @@ export function applyAction(prev: GameState, action: Action, opts: ApplyOptions 
     case 'orderRoll': {
       const o = s.order
       if (s.phase !== 'order' || !o) return fail('Ahora no se tira para el orden de salida')
-      if (action.dice && opts.clientDice === false) return fail('Los dados los tira el servidor')
+      if (action.dice !== undefined && opts.clientDice === false) return fail('Los dados los tira el servidor')
+      if (action.dice !== undefined && !(Array.isArray(action.dice) && action.dice.length === 2)) return fail('Dados inválidos')
       const [a, b] = action.dice ?? [Math.floor(rngNext(s) * 6) + 1, Math.floor(rngNext(s) * 6) + 1]
       if (![a, b].every((d) => Number.isInteger(d) && d >= 1 && d <= 6)) return fail('Dados inválidos')
       o.rolls[me.id] = [a, b]
@@ -257,7 +258,8 @@ export function applyAction(prev: GameState, action: Action, opts: ApplyOptions 
 
     case 'roll': {
       if (s.phase !== 'roll') return fail('Ahora no se puede tirar')
-      if (action.dice && opts.clientDice === false) return fail('Los dados los tira el servidor')
+      if (action.dice !== undefined && opts.clientDice === false) return fail('Los dados los tira el servidor')
+      if (action.dice !== undefined && !(Array.isArray(action.dice) && action.dice.length === 2)) return fail('Dados inválidos')
       const [a, b] = action.dice ?? [Math.floor(rngNext(s) * 6) + 1, Math.floor(rngNext(s) * 6) + 1]
       if (![a, b].every((d) => Number.isInteger(d) && d >= 1 && d <= 6)) return fail('Dados inválidos')
       s.lastDice = [a, b]

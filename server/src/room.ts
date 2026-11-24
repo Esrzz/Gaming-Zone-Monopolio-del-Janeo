@@ -49,7 +49,10 @@ interface Stored {
 }
 
 interface Attach {
+  /** Id público del jugador ('' hasta que manda su token en el join) */
   id: string
+  /** Id al azar de esta conexión (para limitar mensajes antes de saber quién es) */
+  cid: string
   code: string
   create: boolean
   joined: boolean
@@ -98,12 +101,13 @@ export class GameRoom extends DurableObject<Env> {
     if (url.pathname === '/exists') return Response.json({ exists: this.st !== null })
     if (req.headers.get('Upgrade') !== 'websocket') return new Response('Se esperaba WebSocket', { status: 426 })
 
-    const token = url.searchParams.get('token') ?? ''
-    if (token.length < 16 || token.length > 100) return new Response('Token inválido', { status: 400 })
+    // el token va en el mensaje `join` (así no queda en logs); por la URL se sigue aceptando para clientes viejos
+    const token = url.searchParams.get('token')
+    if (token !== null && (token.length < 16 || token.length > 100)) return new Response('Token inválido', { status: 400 })
     const pair = new WebSocketPair()
     const [client, server] = [pair[0], pair[1]]
     this.ctx.acceptWebSocket(server)
-    const att: Attach = { id: await idFromToken(token), code: url.searchParams.get('code') ?? '', create: url.searchParams.get('create') === '1', joined: false }
+    const att: Attach = { id: token ? await idFromToken(token) : '', cid: crypto.randomUUID(), code: url.searchParams.get('code') ?? '', create: url.searchParams.get('create') === '1', joined: false }
     server.serializeAttachment(att)
     return new Response(null, { status: 101, webSocket: client })
   }
@@ -113,13 +117,25 @@ export class GameRoom extends DurableObject<Env> {
     const att = ws.deserializeAttachment() as Attach | null
     if (!att) return
     if (typeof data !== 'string') return this.send(ws, { t: 'error', error: 'Mensaje inválido' })
-    if (this.limited(att.id)) return this.send(ws, { t: 'error', error: 'Demasiados mensajes, más despacio' })
+    if (this.limited(att.id || att.cid)) return this.send(ws, { t: 'error', error: 'Demasiados mensajes, más despacio' })
     const msg = parseClientMessage(data)
     if (!msg) return this.send(ws, { t: 'error', error: 'Mensaje inválido' })
     if (msg.t === 'ping') return this.send(ws, { t: 'pong' })
-    if (msg.t === 'join') return this.onJoin(ws, att, msg)
-    if (!att.joined || !this.st) return this.send(ws, { t: 'error', error: 'Primero unite a una sala' })
-    await this.onMessage(ws, att, msg)
+    // Nada de lo que mande un cliente tiene que tumbar la sala: cualquier excepción inesperada se registra y se le avisa a ese cliente
+    try {
+      if (msg.t === 'join') {
+        let who = att
+        if (msg.token) who = { ...att, id: await idFromToken(msg.token) }
+        if (!who.id) return this.send(ws, { t: 'error', error: 'Token inválido' })
+        if (who !== att) ws.serializeAttachment(who)
+        return await this.onJoin(ws, who, msg)
+      }
+      if (!att.joined || !this.st) return this.send(ws, { t: 'error', error: 'Primero unite a una sala' })
+      await this.onMessage(ws, att, msg)
+    } catch (err) {
+      console.error('Error procesando un mensaje:', msg.t, String(err))
+      this.send(ws, { t: 'error', error: 'Error interno, probá de nuevo' })
+    }
   }
 
   async webSocketClose(ws: WebSocket, code: number): Promise<void> {

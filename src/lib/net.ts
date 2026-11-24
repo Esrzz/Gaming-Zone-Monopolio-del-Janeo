@@ -84,17 +84,17 @@ export class RoomClient {
     this.o.onStatus(this.tries === 0 ? 'connecting' : 'reconnecting')
     const wsUrl = SERVER_URL.replace(/^http/, 'ws')
     // create=1 solo la primera vez: si la conexión se cae y la sala ya existe, se entra como cualquiera
-    const create = this.o.create && !this.joined ? '&create=1' : ''
+    const create = this.o.create && !this.joined
     let ws: WebSocket
     try {
-      ws = new WebSocket(`${wsUrl}/ws/${this.o.code}?token=${encodeURIComponent(getToken())}${create}`)
+      ws = new WebSocket(`${wsUrl}/ws/${this.o.code}${create ? '?create=1' : ''}`)
     } catch {
       return this.retry()
     }
     this.ws = ws
     ws.onopen = () => {
       this.tries = 0
-      ws.send(JSON.stringify({ t: 'join', code: this.o.code, name: this.o.name, avatar: this.o.avatar } satisfies ClientMessage))
+      ws.send(JSON.stringify({ t: 'join', code: this.o.code, name: this.o.name, avatar: this.o.avatar, token: getToken() } satisfies ClientMessage))
       this.ping = setInterval(() => this.send({ t: 'ping' }), 25_000)
     }
     ws.onmessage = (e) => {

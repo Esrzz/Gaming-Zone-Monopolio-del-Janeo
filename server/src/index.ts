@@ -58,7 +58,7 @@ export default {
       return json({ error: 'No se pudo generar un código, probá de nuevo' }, { status: 503 }, cors)
     }
 
-    // WebSocket de una sala: /ws/CODIGO?token=...&create=1
+    // WebSocket de una sala: /ws/CODIGO?create=1 (el token secreto va en el primer mensaje `join`)
     const m = url.pathname.match(/^\/ws\/([A-Za-z0-9]{3,12})$/)
     if (m) {
       if (req.headers.get('Upgrade') !== 'websocket') return json({ error: 'Se esperaba WebSocket' }, { status: 426 }, cors)
@@ -66,7 +66,8 @@ export default {
       const stub = env.ROOMS.get(env.ROOMS.idFromName(code))
       const target = new URL('https://room/ws')
       target.searchParams.set('code', code)
-      target.searchParams.set('token', url.searchParams.get('token') ?? '')
+      const legacyToken = url.searchParams.get('token')
+      if (legacyToken !== null) target.searchParams.set('token', legacyToken) // clientes viejos; los nuevos mandan el token en el join
       if (url.searchParams.get('create') === '1') target.searchParams.set('create', '1')
       return stub.fetch(new Request(target, req))
     }

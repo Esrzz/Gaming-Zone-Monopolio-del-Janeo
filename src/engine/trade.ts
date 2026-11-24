@@ -32,6 +32,9 @@ export function validateTrade(s: GameState, t: TradeOffer): string | null {
   const to = s.players.find((p) => p.id === t.to)
   if (!from || !to || from.bankrupt || to.bankrupt) return 'Jugador inválido'
   if (from.id === to.id) return 'No podés intercambiar con vos mismo'
+  for (const side of [t.give, t.get]) {
+    if (!side || typeof side !== 'object' || !Array.isArray(side.properties)) return 'Oferta inválida'
+  }
 
   for (const side of [t.give, t.get]) {
     if (!isMoney(side.cash) || !isMoney(side.jailCards)) return 'Montos inválidos'

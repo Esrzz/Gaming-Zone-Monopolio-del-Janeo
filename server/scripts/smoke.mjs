@@ -13,13 +13,14 @@ class Client {
   constructor(name, token, code, create) {
     this.name = name
     this.msgs = []
-    this.ws = new WebSocket(`${WS}/ws/${code}?token=${token}${create ? '&create=1' : ''}`)
+    this.token = token
+    this.ws = new WebSocket(`${WS}/ws/${code}${create ? '?create=1' : ''}`)
     this.open = new Promise((res) => this.ws.addEventListener('open', res))
     this.ws.addEventListener('message', (e) => this.msgs.push(JSON.parse(e.data)))
     this.code = code
   }
   send(m) { this.ws.send(JSON.stringify(m)) }
-  join() { this.send({ t: 'join', code: this.code, name: this.name }) }
+  join() { this.send({ t: 'join', code: this.code, name: this.name, token: this.token }) }
   async until(pred, label, ms = 3000) {
     const t0 = Date.now()
     while (Date.now() - t0 < ms) {
@@ -71,9 +72,22 @@ A.clear(); B.clear()
 A.send({ t: 'start' })
 const started = await A.until((m) => m.t === 'room' && m.room.status === 'playing', 'partida iniciada')
 check(started.room.game.rng === 0 && started.room.game.decks.chance.draw.every((c) => c === ''), 'el estado público oculta el orden de los mazos y la semilla')
-check(started.clock && started.clock.turnMsLeft > 200_000, `reloj de turno ~${Math.round(started.clock.turnMsLeft / 1000)}s`)
+check(started.room.game.phase === 'order' && started.clock.turnMsLeft <= 20_000, `empieza con el sorteo del orden (reloj ~${Math.round(started.clock.turnMsLeft / 1000)}s)`)
 
-const game = started.room.game
+// sorteo del orden: cada uno tira en su momento (los empates se repiten) hasta que queda definido
+const byId = { [roomA.you]: A, [roomB.you]: B }
+let game = started.room.game
+let lastClock = started.clock
+for (let i = 0; i < 12 && game.phase === 'order'; i++) {
+  const who = game.order.queue[0]
+  A.clear(); B.clear()
+  byId[who].send({ t: 'action', action: { type: 'orderRoll', player: who } })
+  const up = await A.until((m) => m.t === 'update', 'update del sorteo')
+  game = up.room.game
+  lastClock = up.clock
+}
+check(game.phase === 'roll', 'el orden de salida quedó definido y empieza el primer turno')
+check(lastClock && lastClock.turnMsLeft > 200_000, `reloj de turno ~${Math.round(lastClock.turnMsLeft / 1000)}s`)
 const turnId = game.players[game.current].id
 const [P, Q] = turnId === roomA.you ? [A, B] : [B, A]
 const pid = turnId
@@ -96,17 +110,27 @@ const roll = up.events.find((e) => e.type === 'rolled')
 check(roll && roll.dice.length === 2 && roll.dice.every((d) => d >= 1 && d <= 6), `el servidor tiró los dados: ${roll?.dice}`)
 check(up.seq > 0, `seq=${up.seq}`)
 
-// gestos de pantalla: se reenvían a los demás (no al que los hizo)
+// gestos de pantalla: solo los del dueño del turno, y se reenvían a los demás (no al que los hizo)
 A.clear(); B.clear()
-Q.send({ t: 'ui', kind: 'fast', seq: up.seq })
-const ui = await P.until((m) => m.t === 'ui', 'ui reenviado')
-check(ui.kind === 'fast' && ui.seq === up.seq && ui.from !== pid, 'el gesto de acelerar le llega a los demás')
+Q.send({ t: 'ui', kind: 'fast', seq: up.seq }) // Q no es el dueño del turno: se ignora
+await wait(200)
+check(!P.msgs.some((m) => m.t === 'ui'), 'acelerar la animación de otro jugador no se reenvía')
+P.send({ t: 'ui', kind: 'fast', seq: up.seq })
+const ui = await Q.until((m) => m.t === 'ui', 'ui reenviado')
+check(ui.kind === 'fast' && ui.seq === up.seq && ui.from === pid, 'el gesto del dueño del turno le llega a los demás')
 await wait(150)
-check(!Q.msgs.some((m) => m.t === 'ui'), 'y no se le devuelve a quien lo hizo')
+check(!P.msgs.some((m) => m.t === 'ui'), 'y no se le devuelve a quien lo hizo')
 
 // acciones con forma inválida
 P.send({ t: 'action', action: { type: 'abandon', player: pid } })
 check((await P.until((m) => m.t === 'error' && m !== undefined, 'abandon')).t === 'error', 'abandon no se acepta desde el cliente')
+
+P.clear()
+P.send({ t: 'action', action: { type: 'proposeTrade', player: pid, to: 'x' } }) // sin give/get
+check(/inválido/i.test((await P.until((m) => m.t === 'error', 'error trade mal formado')).error), 'un intercambio mal formado se rechaza sin romper nada')
+P.clear()
+P.send({ t: 'action', action: { type: 'roll', player: pid, dice: 0 } })
+check((await P.until((m) => m.t === 'error', 'error dados 0')).t === 'error', 'dados mal formados se rechazan')
 
 // chat
 A.clear(); B.clear()
@@ -126,9 +150,14 @@ check(back.you === roomB.you && back.room.members.every((x) => x.connected), 'Be
 
 // token inválido
 {
-  const bad = new WebSocket(`${WS}/ws/${code}?token=corto`)
-  const closed = await new Promise((res) => { bad.addEventListener('error', () => res('error')); bad.addEventListener('close', () => res('close')) })
-  check(!!closed, 'token inválido rechazado')
+  const bad = new WebSocket(`${WS}/ws/${code}`)
+  const reply = await new Promise((res) => {
+    bad.addEventListener('open', () => bad.send(JSON.stringify({ t: 'join', code, name: 'X', token: 'corto' })))
+    bad.addEventListener('message', (e) => res(JSON.parse(e.data)))
+    bad.addEventListener('close', () => res({ t: 'closed' }))
+  })
+  check(reply.t === 'error' || reply.t === 'closed', 'token inválido rechazado')
+  bad.close()
 }
 
 A.ws.close(); B2.ws.close()
