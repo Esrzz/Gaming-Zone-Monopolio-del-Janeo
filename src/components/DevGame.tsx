@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { boardOf, applyAction, createGame, currentPlayer, isBuyable, isManageAction, priceOf, timeoutAction } from '../engine'
+import { boardOf, AUCTION_MS, applyAction, createGame, currentPlayer, isBuyable, isManageAction, priceOf, timeoutAction } from '../engine'
 import type { Action, GameEvent, GameState, TradeOffer } from '../engine'
 import { describeEvent } from '../lib/describe'
 import { BoardContext } from '../lib/boardContext'
@@ -18,6 +18,7 @@ import type { SfxHandle } from '../lib/sfx'
 import type { OnlineLink } from '../lib/onlineLink'
 import { tileDot } from '../lib/tileColor'
 import TradeOverlay, { TradeResult } from './TradeOverlay'
+import AuctionOverlay from './AuctionOverlay'
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 const d6 = () => Math.floor(Math.random() * 6) + 1
@@ -106,6 +107,11 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings, online
   // Temporizadores: restante en ms del turno y de la respuesta a una oferta
   const turnMs = useRef(game.rules.turnSeconds * 1000)
   const tradeMs = useRef(TRADE_SECONDS * 1000)
+  const [turnBanner, setTurnBanner] = useState<{ id: string; key: number } | null>(null)
+  const turnBannerTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const auctionMs = useRef(AUCTION_MS)
+  const auctionKey = useRef('')
+  const [auctionLeft, setAuctionLeft] = useState(AUCTION_MS / 1000)
   const firing = useRef(false)
   const beep = useRef<{ key: string; h: SfxHandle; t0: number } | null>(null)
 
@@ -150,7 +156,7 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings, online
   const debt = game.debts.find((d) => d.from === me.id)
   /** En online solo actuás en tu turno; en la partida de prueba el developer maneja a todos */
   const mine = !online || me.id === online.you
-  const locked = busy || game.phase === 'over' || !mine
+  const locked = busy || game.phase === 'over' || !mine || !!game.auction
 
   const addFloat = (player: string, amount: number) => {
     const id = ++floatSeq.current
@@ -242,6 +248,11 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings, online
         setTradeFx({ kind, from: nameOf(e.trade.from), to: nameOf(e.trade.to) })
         tradeFxTimer.current = setTimeout(() => setTradeFx(null), 2000)
         play(kind === 'accepted' ? 'Cardbought' : 'neg')
+      } else if (e.type === 'turn' && !events.some((x) => x.type === 'orderSet') && !events.some((x) => x.type === 'won')) {
+        // pasó el turno de forma definitiva (no con dobles): aviso en el centro del tablero
+        if (turnBannerTimer.current) clearTimeout(turnBannerTimer.current)
+        setTurnBanner({ id: e.player, key: Date.now() })
+        turnBannerTimer.current = setTimeout(() => setTurnBanner(null), 1700)
       } else if (e.type === 'jailed') {
         await sleep(250)
         setShown((p) => ({ ...p, [e.player]: 10 }))
@@ -284,7 +295,7 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings, online
       if (state.debts.some((d) => !online || d.from === online.you)) setManageOpen(true)
       // Cayó en una propiedad libre: la tarjeta sale de la casilla con la opción de comprar (online: solo a quien le toca)
       const cur = state.players[state.current]
-      if (state.phase === 'buy' && (!online || cur.id === online.you)) {
+      if (state.phase === 'buy' && !state.auction && (!online || cur.id === online.you)) {
         const pos = cur.position
         const o = state.owned[pos]
         openProp({ pos, mode: 'buy', ownerName: o ? nameOf(o.owner) : null, cash: cur.cash })
@@ -449,6 +460,7 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings, online
       if (u.kind === 'clock') {
         if (u.clock?.turnMsLeft != null) turnMs.current = u.clock.turnMsLeft
         if (u.clock?.tradeMsLeft != null) tradeMs.current = u.clock.tradeMsLeft
+        if (u.clock?.auctionMsLeft != null) auctionMs.current = u.clock.auctionMsLeft
       } else if (u.kind === 'error') {
         setError(u.error)
         if (spin.current) {
@@ -499,13 +511,21 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings, online
       const { game: g, busy: b } = live.current
       if (g.phase === 'over' || (b && !online)) return stopBeep()
       const trade = !!g.trade
-      const ref = trade ? tradeMs : turnMs
+      const auction = !!g.auction
+      // cada oferta reinicia el tiempo de la subasta (online, el servidor lo corrige con su reloj)
+      const aKey = g.auction ? `${g.auction.tile}:${g.auction.bid}:${g.auction.leader ?? ''}` : ''
+      if (aKey !== auctionKey.current) {
+        auctionKey.current = aKey
+        if (aKey) auctionMs.current = AUCTION_MS
+      }
+      const ref = auction ? auctionMs : trade ? tradeMs : turnMs
       ref.current = Math.max(0, ref.current - dt)
+      setAuctionLeft(Math.ceil(auctionMs.current / 1000))
       setTimeLeft(Math.ceil(turnMs.current / 1000))
       setTradeLeft(Math.ceil(tradeMs.current / 1000))
 
       // Cuenta regresiva: si se interrumpió (animación, otra oferta) retoma desde el punto que corresponde
-      const key = `${trade ? 'trade' : 'turn'}:${g.current}:${g.trade?.to ?? ''}`
+      const key = `${auction ? 'auction:' + aKey : trade ? 'trade' : 'turn'}:${g.current}:${g.trade?.to ?? ''}`
       const leadMs = TIMEROUT_LEAD_S * 1000
       if (ref.current > 0 && ref.current <= leadMs) {
         if (beep.current?.key !== key) {
@@ -530,7 +550,7 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings, online
     }
   }, [])
 
-  const timerUrgent = timeLeft <= 10 && !busy && !game.trade
+  const timerUrgent = timeLeft <= 10 && !busy && !game.trade && !game.auction
   const shownLog = logExpanded ? log : log.slice(-4)
 
   return (
@@ -556,6 +576,17 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings, online
         overlay={
           tradeFx ? (
             <TradeResult kind={tradeFx.kind} from={tradeFx.from} to={tradeFx.to} />
+          ) : game.auction && game.phase !== 'over' ? (
+            <AuctionOverlay
+              auction={game.auction}
+              players={game.players}
+              nameOf={nameOf}
+              secondsLeft={auctionLeft}
+              you={online ? online.you : null}
+              busy={false}
+              onBid={(player, amount) => void dispatch({ type: 'bid', player, amount }, true)}
+              onPass={(player) => void dispatch({ type: 'passAuction', player }, true)}
+            />
           ) : game.trade && game.phase !== 'over' ? (
             <TradeOverlay
               trade={game.trade}
@@ -567,6 +598,13 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings, online
               onReject={() => void dispatch({ type: 'rejectTrade', player: game.trade!.to })}
               onCancel={() => void dispatch({ type: 'cancelTrade', player: game.trade!.from })}
             />
+          ) : turnBanner ? (
+            <div className="tradefx" key={turnBanner.key} role="status" aria-live="polite">
+              <div className="turn-banner" style={{ ['--pc' as string]: colors[turnBanner.id] }}>
+                <small>Empieza el turno de</small>
+                <strong>{nameOf(turnBanner.id)}</strong>
+              </div>
+            </div>
           ) : null
         }
         property={
@@ -712,7 +750,7 @@ export default function DevGame({ seats, onExit, onSettings: _onSettings, online
                 </div>
               )}
 
-              {mine && !owing && game.phase === 'buy' && isBuyable(tile) && (
+              {mine && !owing && game.phase === 'buy' && !game.auction && isBuyable(tile) && (
                 <div className="stack">
                   <button className="btn primary" disabled={locked || me.cash < priceOf(tile)} onClick={() => void dispatch({ type: 'buy', player: me.id })}>
                     Comprar {tile.name} (${priceOf(tile)})

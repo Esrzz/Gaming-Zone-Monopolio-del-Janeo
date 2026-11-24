@@ -155,3 +155,6 @@ Todas las opciones (audio, 3D, tamaño de interfaz, atajos) viven en un solo obj
 
 ### Orden de salida por dados
 Al empezar una partida online todos tiran los dados en el orden en que entraron al lobby (fase `order`, 20 s por tirada; si se acaba el tiempo tira el servidor). El que saca más va primero; los empates vuelven a tirar entre sí hasta desempatar. Si alguien se va o quiebra durante la tirada, sale del sorteo. La partida de prueba offline no usa esta fase.
+
+### Subasta
+Si el jugador de turno no compra la propiedad en la que cayó (o se le acaba el tiempo), se abre una subasta en el centro del tablero: cualquiera puede ofrecer más (solo cuenta la plata en mano) o retirarse. Quien no llega a superar la oferta se retira solo. Cada oferta reinicia 20 s; al vencer, gana la oferta más alta (si nadie ofreció, la propiedad queda libre). Durante la subasta no se puede hacer nada más. Es la acción `closeAuction` (reservada al servidor) la que la cierra por tiempo.

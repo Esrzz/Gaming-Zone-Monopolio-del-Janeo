@@ -57,6 +57,11 @@ describe('relojes', () => {
       const act = timeoutAction(s)!
       s = run(s, act)
       c = advanceClock(c, s, now, cfg)
+      // si el turno cayó en una subasta, esta vence por su cuenta y sigue la cadena
+      if (s.auction && !isDue(c, now)) {
+        now = c.auctionEndsAt!
+        expect(isDue(c, now)).toBe(true)
+      }
     }
     expect(c.player).toBe('b')
     expect(isDue(c, now)).toBe(false)

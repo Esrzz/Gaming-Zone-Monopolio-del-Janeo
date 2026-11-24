@@ -129,7 +129,7 @@ export default function Board({ game, seats, shown, colors, drawable = null, onD
             onClick={diceAction ? onDiceClick : undefined}
             onKeyDown={diceAction ? (e) => (e.key === 'Enter' || e.key === ' ') && onDiceClick?.() : undefined}
           >
-            {(rollFaces ?? game.lastDice ?? [0, 0]).map((d, i) => (
+            {(rollFaces ?? game.lastDice ?? [5, 2]).map((d, i) => (
               <Die key={i} value={d} rolling={!!rollFaces} />
             ))}
           </div>

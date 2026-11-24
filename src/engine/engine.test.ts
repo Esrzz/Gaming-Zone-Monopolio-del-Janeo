@@ -26,6 +26,13 @@ function run(s: GameState, action: Action): { state: GameState; events: GameEven
   return r
 }
 
+/** Rechaza la compra y, como se abre una subasta, todos se retiran (la propiedad queda libre). */
+function declineAndPass(s: GameState, id: string): GameState {
+  s = run(s, { type: 'decline', player: id }).state
+  for (const p of s.players) if (s.auction && !p.bankrupt) s = run(s, { type: 'passAuction', player: p.id }).state
+  return s
+}
+
 const player = (s: GameState, id: string) => s.players.find((p) => p.id === id)!
 
 /** Deja al jugador de turno a `steps` casillas de `target` para que una tirada lo haga caer ahí. */
@@ -126,7 +133,7 @@ describe('turnos y movimiento', () => {
     s.players[0].cash = 10
     s = run(s, roll(A, 1, 2)).state
     expect(applyAction(s, { type: 'buy', player: A }).ok).toBe(false)
-    s = run(s, { type: 'decline', player: A }).state
+    s = declineAndPass(s, A)
     expect(s.phase).toBe('end')
     expect(s.owned[3]).toBeUndefined()
   })
@@ -245,11 +252,11 @@ describe('cárcel', () => {
     // primer doble: 3+2=5 → YouTube (plataforma libre)
     s = run(s, roll(A, 1, 1)).state // 3+2 = 5
     // casilla 5 es YouTube (plataforma libre) → fase buy
-    s = run(s, { type: 'decline', player: A }).state
+    s = declineAndPass(s, A)
     expect(s.phase).toBe('roll')
     // segundo doble: 5+4 = 9 → lightblue (propiedad libre)
     s = run(s, roll(A, 2, 2)).state
-    s = run(s, { type: 'decline', player: A }).state
+    s = declineAndPass(s, A)
     expect(s.phase).toBe('roll')
     // tercer doble: va a la cárcel
     s = run(s, roll(A, 3, 3)).state
@@ -335,11 +342,11 @@ describe('bancarrota', () => {
     expect(s.phase).toBe('roll')
     expect(currentPlayer(s).id).toBe(B)
     s = run(s, roll(B, 1, 2)).state
-    s = run(s, { type: 'decline', player: B }).state
+    s = declineAndPass(s, B)
     s = run(s, { type: 'endTurn', player: B }).state
     expect(currentPlayer(s).id).toBe(C)
     s = run(s, roll(C, 1, 2)).state
-    s = run(s, { type: 'decline', player: C }).state
+    s = declineAndPass(s, C)
     s = run(s, { type: 'endTurn', player: C }).state
     expect(currentPlayer(s).id).toBe(B) // saltea a Ana, que quebró
   })

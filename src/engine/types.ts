@@ -129,6 +129,18 @@ export interface GameState {
   debts: Debt[]
   /** Oferta de intercambio abierta (null si no hay) */
   trade: TradeOffer | null
+  /** Subasta abierta de una propiedad que el jugador de turno no quiso comprar (null si no hay) */
+  auction?: Auction | null
+}
+
+/** Subasta al mejor postor: cualquiera puede ofrecer más o retirarse; gana el último que queda con la oferta más alta. */
+export interface Auction {
+  tile: number
+  /** Oferta más alta hasta ahora (0 = nadie ofreció todavía) */
+  bid: number
+  leader: PlayerId | null
+  /** Los que se retiraron (no pueden volver a entrar) */
+  passed: PlayerId[]
 }
 
 export type DeckName = 'chance' | 'chest'
@@ -186,6 +198,12 @@ export type Action =
   | { type: 'orderRoll'; player: PlayerId; dice?: [number, number] }
   | { type: 'buy'; player: PlayerId }
   | { type: 'decline'; player: PlayerId }
+  /** Subasta: ofrecer `amount` (más que la oferta actual y no más que tu plata) */
+  | { type: 'bid'; player: PlayerId; amount: number }
+  /** Subasta: retirarse */
+  | { type: 'passAuction'; player: PlayerId }
+  /** Solo la manda el servidor al vencer el tiempo: cierra la subasta con lo que haya */
+  | { type: 'closeAuction'; player: PlayerId }
   | { type: 'endTurn'; player: PlayerId }
   | { type: 'payJailFine'; player: PlayerId }
   | { type: 'useJailCard'; player: PlayerId }
@@ -214,6 +232,10 @@ export type GameEvent =
   | { type: 'moved'; player: PlayerId; from: number; to: number; steps: number; passedGo: boolean }
   | { type: 'bought'; player: PlayerId; tile: number; price: number }
   | { type: 'declined'; player: PlayerId; tile: number }
+  | { type: 'auctionStarted'; tile: number }
+  | { type: 'bid'; player: PlayerId; amount: number }
+  | { type: 'auctionWon'; player: PlayerId; tile: number; amount: number }
+  | { type: 'auctionUnsold'; tile: number }
   | { type: 'rent'; from: PlayerId; to: PlayerId; tile: number; amount: number }
   | { type: 'paid'; from: PlayerId; to: PlayerId | 'bank' | 'pot'; amount: number }
   /** No alcanzó la plata pero se puede juntar vendiendo/hipotecando: queda una deuda pendiente */

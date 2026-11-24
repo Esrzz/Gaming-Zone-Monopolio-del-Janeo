@@ -14,7 +14,7 @@ import { play as playSfx } from './lib/sfx'
 import { loadProfileSettings } from './lib/settingsStore'
 import { useAudio } from './lib/useAudio'
 
-type Screen = 'name' | 'menu' | 'play' | 'join' | 'host' | 'devgame' | 'online'
+type Screen = 'name' | 'menu' | 'play' | 'join' | 'devgame' | 'online'
 
 interface Profile {
   id: string | null
@@ -211,8 +211,9 @@ export default function App() {
 
             {screen === 'play' && (
               <div className="stack">
-                <button className="btn primary" onClick={() => setScreen('host')}>
-                  Hostear partida
+                {hostError && <p className="err">{hostError}</p>}
+                <button className="btn primary" disabled={hostBusy} onClick={() => void hostRoom()}>
+                  {hostBusy ? 'Creando sala…' : 'Hostear partida'}
                 </button>
                 <button className="btn ghost" onClick={() => setScreen('join')}>
                   Unirse con código
@@ -236,19 +237,6 @@ export default function App() {
                 />
                 <button className="btn primary" disabled={code.length < 4} onClick={() => joinRoom(code)}>
                   Unirse
-                </button>
-                <button className="link" onClick={() => setScreen('play')}>
-                  Volver
-                </button>
-              </div>
-            )}
-
-            {screen === 'host' && (
-              <div className="stack">
-                <p className="muted">Se crea una sala nueva y te da un código para compartir con tus amigos.</p>
-                {hostError && <p className="err">{hostError}</p>}
-                <button className="btn primary" disabled={hostBusy} onClick={() => void hostRoom()}>
-                  {hostBusy ? 'Creando…' : 'Crear sala'}
                 </button>
                 <button className="link" onClick={() => setScreen('play')}>
                   Volver

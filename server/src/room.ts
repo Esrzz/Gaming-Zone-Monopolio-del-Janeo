@@ -339,7 +339,7 @@ export class GameRoom extends DurableObject<Env> {
     }
     if (room.status === 'playing' && isDue(st.clock, now)) {
       // no se pudo avanzar: se reintenta más tarde en vez de girar en falso
-      st.clock = { ...st.clock, turnEndsAt: st.clock.turnEndsAt === null ? null : now + 10_000, tradeEndsAt: st.clock.tradeEndsAt === null ? null : now + 10_000 }
+      st.clock = { ...st.clock, turnEndsAt: st.clock.turnEndsAt === null ? null : now + 10_000, tradeEndsAt: st.clock.tradeEndsAt === null ? null : now + 10_000, auctionEndsAt: st.clock.auctionEndsAt == null ? null : now + 10_000 }
     }
 
     // 2) Desconectados que no volvieron a tiempo

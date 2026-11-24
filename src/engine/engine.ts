@@ -103,6 +103,7 @@ export function createGame(
     seq: 0,
     debts: [],
     trade: null,
+    auction: null,
   }
 }
 
@@ -174,7 +175,7 @@ export interface ApplyOptions {
 }
 
 /** Acciones que solo puede mandar el servidor (nunca un cliente). */
-export const isServerOnly = (a: Action): boolean => a.type === 'abandon'
+export const isServerOnly = (a: Action): boolean => a.type === 'abandon' || a.type === 'closeAuction'
 
 /** Acciones que no se pueden hacer mientras haya deudas pendientes. */
 const BLOCKED_BY_DEBT = new Set<Action['type']>(['roll', 'buy', 'decline', 'endTurn', 'payJailFine', 'useJailCard', 'drawCard'])
@@ -209,6 +210,16 @@ export function applyAction(prev: GameState, action: Action, opts: ApplyOptions 
 
   // Mientras se define el orden de salida no se puede hacer nada más que tirar (ni intercambiar ni construir)
   if (s.phase === 'order' && action.type !== 'orderRoll') return fail('Todavía se está definiendo el orden de salida')
+
+  // Subasta abierta: la puede jugar cualquiera (en su turno o no) y no se puede hacer nada más hasta que cierre
+  if (s.auction) {
+    if (action.type !== 'bid' && action.type !== 'passAuction' && action.type !== 'closeAuction') {
+      return fail('Hay una subasta en curso: ofrecé, retirate o esperá a que termine')
+    }
+    const error = applyAuctionAction(s, ev, me, action)
+    return error ? fail(error) : done()
+  }
+  if (action.type === 'bid' || action.type === 'passAuction' || action.type === 'closeAuction') return fail('No hay ninguna subasta abierta')
 
   // Los intercambios se responden en cualquier momento; proponerlos solo se puede en tu turno (ver trade.ts).
   if (isTradeAction(action)) {
@@ -297,10 +308,12 @@ export function applyAction(prev: GameState, action: Action, opts: ApplyOptions 
     }
 
     case 'decline': {
-      // TODO: acá va la subasta obligatoria cuando esté implementada.
       if (s.phase !== 'buy') return fail('No hay nada para rechazar')
       ev.push({ type: 'declined', player: me.id, tile: me.position })
-      settle(s)
+      // Subasta obligatoria: la propiedad se la queda el que más ofrezca (la fase sigue en 'buy' hasta que cierre)
+      s.auction = { tile: me.position, bid: 0, leader: null, passed: [] }
+      ev.push({ type: 'auctionStarted', tile: me.position })
+      checkAuction(s, ev)
       break
     }
 
@@ -599,6 +612,58 @@ function returnJailCard(s: GameState) {
   }
 }
 
+/** Ofrecer, retirarse o cerrar (por tiempo) la subasta abierta. Devuelve un error o null si se aplicó. */
+function applyAuctionAction(s: GameState, ev: GameEvent[], me: PlayerState, action: Action): string | null {
+  const a = s.auction!
+  if (action.type === 'closeAuction') {
+    finishAuction(s, ev)
+    return null
+  }
+  if (a.passed.includes(me.id)) return 'Ya te retiraste de esta subasta'
+  if (action.type === 'passAuction') {
+    if (a.leader === me.id) return 'Tenés la oferta más alta: no podés retirarte'
+    a.passed.push(me.id)
+    checkAuction(s, ev)
+    return null
+  }
+  if (action.type !== 'bid') return 'Acción inválida'
+  if (a.leader === me.id) return 'Ya tenés la oferta más alta'
+  if (!Number.isInteger(action.amount) || action.amount <= a.bid) return `Tenés que ofrecer más de $${a.bid}`
+  if (action.amount > me.cash) return 'No te alcanza la plata (en una subasta solo cuenta la plata en mano)'
+  a.bid = action.amount
+  a.leader = me.id
+  ev.push({ type: 'bid', player: me.id, amount: action.amount })
+  checkAuction(s, ev)
+  return null
+}
+
+/** Cierra la subasta si ya no queda nadie que pueda superar la oferta (los que no llegan se retiran solos). */
+function checkAuction(s: GameState, ev: GameEvent[]) {
+  const a = s.auction
+  if (!a) return
+  const alive = s.players.filter((p) => !p.bankrupt)
+  for (const p of alive) {
+    if (p.id !== a.leader && !a.passed.includes(p.id) && p.cash <= a.bid) a.passed.push(p.id)
+  }
+  if (alive.every((p) => p.id === a.leader || a.passed.includes(p.id))) finishAuction(s, ev)
+}
+
+function finishAuction(s: GameState, ev: GameEvent[]) {
+  const a = s.auction
+  if (!a) return
+  const winner = a.leader ? s.players.find((p) => p.id === a.leader && !p.bankrupt && p.cash >= a.bid) : null
+  if (winner) {
+    winner.cash -= a.bid
+    s.owned[a.tile] = { owner: winner.id, mortgaged: false, houses: 0 }
+    ev.push({ type: 'auctionWon', player: winner.id, tile: a.tile, amount: a.bid })
+  } else {
+    ev.push({ type: 'auctionUnsold', tile: a.tile })
+  }
+  s.auction = null
+  // si el turno sigue siendo el de quien rechazó la compra, continúa (tirar de nuevo o terminar)
+  if (s.phase === 'buy') settle(s)
+}
+
 function goBankrupt(s: GameState, ev: GameEvent[], p: PlayerState, creditor: PlayerState | null) {
   const wasCurrent = currentPlayer(s).id === p.id
   const heldJail = p.jailCards
@@ -621,8 +686,13 @@ function goBankrupt(s: GameState, ev: GameEvent[], p: PlayerState, creditor: Pla
   ev.push({ type: 'bankrupt', player: p.id, creditor: creditor?.id ?? null })
   cancelTradeOf(s, ev, p.id)
 
+  if (s.auction && s.auction.leader === p.id) {
+    s.auction.leader = null
+    s.auction.bid = 0
+  }
   const alive = s.players.filter((x) => !x.bankrupt)
   if (alive.length === 1) {
+    s.auction = null
     s.winner = alive[0].id
     s.phase = 'over'
     ev.push({ type: 'won', player: alive[0].id })
@@ -631,6 +701,7 @@ function goBankrupt(s: GameState, ev: GameEvent[], p: PlayerState, creditor: Pla
   } else if (wasCurrent) {
     nextTurn(s, ev)
   }
+  checkAuction(s, ev)
 }
 
 /** El que tira ahora en la fase `order` es el primero de la cola. */
@@ -707,6 +778,7 @@ export function timeoutAction(s: GameState): Action | null {
   if (s.phase === 'over') return null
   if (s.trade) return { type: 'rejectTrade', player: s.trade.to }
   const p = currentPlayer(s)
+  if (s.auction) return { type: 'closeAuction', player: p.id }
   if (s.phase === 'order') return { type: 'orderRoll', player: p.id }
   if (s.debts.some((d) => d.from === p.id)) return { type: 'bankrupt', player: p.id }
   switch (s.phase) {

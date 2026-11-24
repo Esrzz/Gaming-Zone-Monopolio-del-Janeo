@@ -31,6 +31,14 @@ export function describeEvent(e: GameEvent, name: (id: string) => string, board:
       return `${name(e.player)} compró ${board[e.tile].name} por ${money(e.price)}`
     case 'declined':
       return `${name(e.player)} no compró ${board[e.tile].name}`
+    case 'auctionStarted':
+      return `🔨 Subasta de ${board[e.tile].name}`
+    case 'bid':
+      return `${name(e.player)} ofrece ${money(e.amount)}`
+    case 'auctionWon':
+      return `🔨 ${name(e.player)} ganó ${board[e.tile].name} por ${money(e.amount)}`
+    case 'auctionUnsold':
+      return `Nadie ofreció por ${board[e.tile].name}: queda libre`
     case 'rent':
       return `${name(e.from)} pagó ${money(e.amount)} de alquiler a ${name(e.to)}`
     case 'paid':
